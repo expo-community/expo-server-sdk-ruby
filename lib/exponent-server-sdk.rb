@@ -2,6 +2,10 @@ require "exponent-server-sdk/version"
 
 module Exponent
   module Push
+    def self.is_exponent_push_token?(token)
+      token.start_with?('ExponentPushToken')
+    end
+
     class Client
       def publish options
         data = options.delete(:data)
