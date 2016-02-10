@@ -1,4 +1,5 @@
-require "exponent-server-sdk/version"
+require 'exponent-server-sdk/version'
+require 'cgi'
 
 module Exponent
   module Push
@@ -9,7 +10,7 @@ module Exponent
     class Client
       def publish options
         data = options.delete(:data)
-        response = HTTParty.post('https://exp.host/--/api/notify/' + options.to_json, {
+        response = HTTParty.post('https://exp.host/--/api/notify/' + CGI.escape(options.to_json), {
           body: data.to_json,
           headers: {
             'Content-Type': 'application/json',
