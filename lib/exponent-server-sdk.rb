@@ -1,5 +1,4 @@
 require 'exponent-server-sdk/version'
-require 'cgi'
 
 module Exponent
   module Push
@@ -10,13 +9,12 @@ module Exponent
     class Client
       def publish options
         data = options.delete(:data)
-        response = HTTParty.post('https://exp.host/--/api/notify/' + CGI.escape(options.to_json), {
-          body: data.to_json,
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
+        response = HTTParty.post('https://exp.host/--/api/notify/' + ERB::Util.url_encode([options].to_json),
+          :body => data.to_json,
+          :headers => {
+            'Content-Type' => 'application/json'
           }
-        })
+        )
 
         case response.code
           when 400
