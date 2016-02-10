@@ -1,4 +1,4 @@
-# Exponent Server SDK
+# Exponent Server SDK Ruby
 
 Use to send push notifications to Exponent Experiences from a Ruby server.
 
