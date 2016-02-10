@@ -1,0 +1,25 @@
+# coding: utf-8
+lib = File.expand_path('../lib', __FILE__)
+$LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
+require 'exponent-server-sdk/version'
+
+Gem::Specification.new do |spec|
+  spec.name          = "exponent-server-sdk"
+  spec.version       = Exponent::VERSION
+  spec.authors       = ["Jesse Ruder"]
+  spec.email         = ["jesse@sixfivezero.net"]
+  spec.summary       = %q{Exponent Server SDK}
+  spec.description   = %q{Exponent Server SDK}
+  spec.homepage      = ""
+  spec.license       = "MIT"
+
+  spec.files         = `git ls-files -z`.split("\x0")
+  spec.executables   = spec.files.grep(%r{^bin/}) { |f| File.basename(f) }
+  spec.test_files    = spec.files.grep(%r{^(test|spec|features)/})
+  spec.require_paths = ["lib"]
+
+  spec.add_dependency "httparty"
+
+  spec.add_development_dependency "bundler", "~> 1.5"
+  spec.add_development_dependency "rake"
+end
