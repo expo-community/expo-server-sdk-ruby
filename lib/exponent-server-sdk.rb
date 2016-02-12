@@ -1,5 +1,7 @@
 require 'exponent-server-sdk/version'
 
+require 'httparty'
+
 module Exponent
   module Push
     def self.is_exponent_push_token?(token)
