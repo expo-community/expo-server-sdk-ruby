@@ -1,5 +1,5 @@
 # Exponent Server SDK Ruby
-[![Build Status](https://travis-ci.org/jkeam/exponent-server-sdk-ruby.svg?branch=master)](https://travis-ci.org/jkeam/exponent-server-sdk-ruby)
+[![Build Status](https://travis-ci.org/expo/exponent-server-sdk-ruby.svg?branch=master)](https://travis-ci.org/expo/exponent-server-sdk-ruby)
 
 Use to send push notifications to Exponent Experiences from a Ruby server.
 
