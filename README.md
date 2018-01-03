@@ -3,6 +3,8 @@
 
 Use to send push notifications to Exponent Experiences from a Ruby server.
 
+If you have problems with the code in this repository, please file issues & bug reports at https://github.com/expo/expo. Thanks!
+
 ## Installation
 
 Add this line to your application's Gemfile:
