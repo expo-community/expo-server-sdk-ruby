@@ -23,7 +23,7 @@ module Exponent
           }
         )
 
-        case response.code
+        case response.code.to_i
           when 400
             raise Exponent::Push::Errors::InvalidPushTokenError
         end
