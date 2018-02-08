@@ -1,60 +1,81 @@
 require 'exponent-server-sdk/version'
-
-require 'httparty'
+require 'typhoeus'
+require 'json'
 
 module Exponent
+  def self.is_exponent_push_token?(token)
+    token.start_with?('ExponentPushToken')
+  end
+
   module Push
-    def self.is_exponent_push_token?(token)
-      token.start_with?('ExponentPushToken')
-    end
-
-    class LegacyClient
-
-      def initialize(new_http_client=nil)
-        @http_client = new_http_client || HTTParty
-      end
-
-      def publish(options)
-        data = options.delete(:data)
-        response = @http_client.post('https://exp.host/--/api/notify/' + ERB::Util.url_encode([options].to_json),
-          :body => data.to_json,
-          :headers => {
-            'Content-Type' => 'application/json'
-          }
-        )
-
-        case response.code
-          when 400
-            raise Exponent::Push::Errors::InvalidPushTokenError
-        end
-      end
-    end
+    Error = Class.new(StandardError)
 
     class Client
 
-      def initialize(new_http_client=nil)
-        @http_client = new_http_client || HTTParty
+      def initialize(new_http_client = nil)
+        @http_client = new_http_client || Typhoeus
       end
 
       def publish(messages)
-        response = @http_client.post('https://exp.host/--/api/v2/push/send',
-          body: messages.to_json,
-          headers: {
-            'Content-Type' => 'application/json',
-            'Accept' => 'application/json',
-            'Accept-Encoding' => 'gzip, deflate'
-          }
-        )
+        handle_response(push_notifications(messages))
+      end
 
-        case response.code
-          when 400
-            raise Exponent::Push::Errors::InvalidPushTokenError
+      private
+
+      def handle_response(response)
+        case response.code.to_s
+        when /(^4|^5)/
+          error = extract_error(parse_json(response))
+          raise Error, "#{error.fetch('code')} -> #{error.fetch('message')}"
+        else
+          handle_success(parse_json(response).fetch('data').first)
         end
       end
-    end
 
-    module Errors
-      class InvalidPushTokenError < StandardError
+      def parse_json(response)
+        JSON.parse(response.body)
+      end
+
+      def extract_error(body)
+        if body.respond_to?(:fetch)
+          body.fetch('errors').first { unknown_error }
+        else
+          unknown_error
+        end
+      end
+
+      attr_reader :http_client
+
+      def push_notifications(messages)
+        http_client.post(
+          push_url,
+          body: messages.to_json,
+          headers: headers
+        )
+      end
+
+      def push_url
+        'https://exp.host/--/api/v2/push/send'
+      end
+
+      def headers
+        {
+          'Content-Type'    => 'application/json',
+          'Accept'          => 'application/json',
+          'Accept-Encoding' => 'gzip, deflate'
+        }
+      end
+
+      def handle_success(data)
+        return data if data.fetch('status') == 'ok'
+        raise Exponent::Push::Error, "#{data['details']['error']} -> #{data['message']}"
+      end
+
+      def unknown_error
+        {
+          'code' => 'Unknown code',
+          'message' => 'Unknown message'
+        }
       end
     end
   end
