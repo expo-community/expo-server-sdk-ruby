@@ -27,23 +27,9 @@ $ gem install exponent-server-sdk
 
 ## Usage
 
-### Legacy
+### Client
 
-There is a legacy client that uses version 1 of the api.  It's simpler but has limitations like only allowing you to publish messages to a single user per call.
-
-```ruby
-exponent = Exponent::Push::LegacyClient.new
-
-exponent.publish(
-  exponentPushToken: token,
-  message: message,
-  data: {a: 'b'}, # Any arbitrary data to include with the notification
-)
-```
-
-### Current
-
-The new client is the preferred way.  This hits the latest version of the api.
+The push client is the preferred way.  This hits the latest version of the api.
 
 ```ruby
 exponent = Exponent::Push::Client.new
