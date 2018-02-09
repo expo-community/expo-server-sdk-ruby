@@ -22,13 +22,14 @@ module Exponent
 
       private
 
+      attr_reader :http_client
+
       def handle_response(response)
         case response.code.to_s
         when /(^4|^5)/
-          error = extract_error(parse_json(response))
-          raise Error, "#{error.fetch('code')} -> #{error.fetch('message')}"
+          raise Error, build_error_from_failure(parse_json(response))
         else
-          handle_success(parse_json(response).fetch('data').first)
+          handle_success(parse_json(response))
         end
       end
 
@@ -36,15 +37,22 @@ module Exponent
         JSON.parse(response.body)
       end
 
-      def extract_error(body)
-        if body.respond_to?(:fetch)
-          body.fetch('errors').first { unknown_error }
-        else
-          unknown_error
+      def build_error_from_failure(response)
+        build_error_with_handling(response) do
+          extract_error_from_response(response)
         end
       end
 
-      attr_reader :http_client
+      def extract_error_from_response(response)
+        error = response.fetch('errors').first { unknown_error_format(response) }
+        "#{error.fetch('code')} -> #{error.fetch('message')}"
+      end
+
+      def build_error_with_handling(response)
+        yield(response)
+      rescue KeyError
+        unknown_error_format(response)
+      end
 
       def push_notifications(messages)
         http_client.post(
@@ -66,16 +74,38 @@ module Exponent
         }
       end
 
-      def handle_success(data)
-        return data if data.fetch('status') == 'ok'
-        raise Exponent::Push::Error, "#{data['details']['error']} -> #{data['message']}"
+      def handle_success(response)
+        data = extract_data(response)
+        if data.fetch('status') == 'ok'
+          data
+        else
+          raise Error, build_error_from_success(response)
+        end
       end
 
-      def unknown_error
-        {
-          'code' => 'Unknown code',
-          'message' => 'Unknown message'
-        }
+      def build_error_from_success(response)
+        build_error_with_handling(response) do
+          extract_error_from_success(response)
+        end
+      end
+
+      def extract_error_from_success(response)
+        data = extract_data(response)
+        message = data.fetch('message')
+
+        if data['details']
+          "#{data.fetch('details').fetch('error')} -> #{message}"
+        else
+          "#{data.fetch('status')} -> #{message}"
+        end
+      end
+
+      def extract_data(response)
+        response.fetch('data').first
+      end
+
+      def unknown_error_format(response)
+        "Unknown error format: #{response}"
       end
     end
   end
