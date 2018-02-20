@@ -109,8 +109,7 @@ class ExponentServerSdkTest < Minitest::Test
         body: messages.to_json,
         headers: {
           'Content-Type' => 'application/json',
-          'Accept' => 'application/json',
-          'Accept-Encoding' => 'gzip, deflate'
+          'Accept' => 'application/json'
         }
       }
     ]
