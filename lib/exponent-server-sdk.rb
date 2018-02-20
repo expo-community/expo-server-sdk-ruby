@@ -69,8 +69,7 @@ module Exponent
       def headers
         {
           'Content-Type'    => 'application/json',
-          'Accept'          => 'application/json',
-          'Accept-Encoding' => 'gzip, deflate'
+          'Accept'          => 'application/json'
         }
       end
 
