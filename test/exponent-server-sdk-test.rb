@@ -19,7 +19,7 @@ class ExponentServerSdkTest < Minitest::Test
     @mock.verify
   end
 
-  def test_publish_with_error
+  def test_publish_with_unknown_error
     @response_mock.expect(:code, 400)
     @response_mock.expect(:body, error_body.to_json)
     message = 'An unknown error occurred.'
@@ -35,9 +35,9 @@ class ExponentServerSdkTest < Minitest::Test
     @mock.verify
   end
 
-  def test_publish_with_success_and_errors
+  def test_publish_with_device_not_registered_error
     @response_mock.expect(:code, 200)
-    @response_mock.expect(:body, success_with_error_body.to_json)
+    @response_mock.expect(:body, not_registered_device_error_body.to_json)
     message = '"ExponentPushToken[42]" is not a registered push notification recipient'
 
     @mock.expect(:post, @response_mock, client_args)
@@ -51,9 +51,57 @@ class ExponentServerSdkTest < Minitest::Test
     @mock.verify
   end
 
-  def test_publish_with_success_and_apn_error
+  def test_publish_with_message_too_big_error
     @response_mock.expect(:code, 200)
-    @response_mock.expect(:body, success_with_apn_error_body.to_json)
+    @response_mock.expect(:body, message_too_big_error_body.to_json)
+    message = 'Message too big'
+
+    @mock.expect(:post, @response_mock, client_args)
+
+    exception = assert_raises Exponent::Push::MessageTooBigError do
+      @exponent.publish(messages)
+    end
+
+    assert_equal(message, exception.message)
+
+    @mock.verify
+  end
+
+  def test_publish_with_message_rate_exceeded_error
+    @response_mock.expect(:code, 200)
+    @response_mock.expect(:body, message_rate_exceeded_error_body.to_json)
+    message = 'Message rate exceeded'
+
+    @mock.expect(:post, @response_mock, client_args)
+
+    exception = assert_raises Exponent::Push::MessageRateExceededError do
+      @exponent.publish(messages)
+    end
+
+    assert_equal(message, exception.message)
+
+    @mock.verify
+  end
+
+  def test_publish_with_invalid_credentials_error
+    @response_mock.expect(:code, 200)
+    @response_mock.expect(:body, invalid_credentials_error_body.to_json)
+    message = 'Invalid credentials'
+
+    @mock.expect(:post, @response_mock, client_args)
+
+    exception = assert_raises Exponent::Push::InvalidCredentialsError do
+      @exponent.publish(messages)
+    end
+
+    assert_equal(message, exception.message)
+
+    @mock.verify
+  end
+
+  def test_publish_with_apn_error
+    @response_mock.expect(:code, 200)
+    @response_mock.expect(:body, apn_error_body.to_json)
 
     @mock.expect(:post, @response_mock, client_args)
 
@@ -81,17 +129,26 @@ class ExponentServerSdkTest < Minitest::Test
     }
   end
 
-  def success_with_error_body
-    {
-      'data' => [{
-        'status'  => 'error',
-        'message' => '"ExponentPushToken[42]" is not a registered push notification recipient',
-        'details' => { 'error' => 'DeviceNotRegistered' }
-      }]
-    }
+  def message_too_big_error_body
+    build_error_body('MessageTooBig', 'Message too big')
   end
 
-  def success_with_apn_error_body
+  def not_registered_device_error_body
+    build_error_body(
+      'DeviceNotRegistered',
+      '"ExponentPushToken[42]" is not a registered push notification recipient'
+    )
+  end
+
+  def message_rate_exceeded_error_body
+    build_error_body('MessageRateExceeded', 'Message rate exceeded')
+  end
+
+  def invalid_credentials_error_body
+    build_error_body('InvalidCredentials', 'Invalid credentials')
+  end
+
+  def apn_error_body
     {
       'data' => [{
         'status' => 'error',
@@ -124,5 +181,15 @@ class ExponentServerSdkTest < Minitest::Test
       badge: 1,
       body: "You've got mail"
     }]
+  end
+
+  def build_error_body(error_code, message)
+    {
+      'data' => [{
+        'status' => 'error',
+        'message' => message,
+        'details' => { 'error' => error_code }
+      }]
+    }
   end
 end
