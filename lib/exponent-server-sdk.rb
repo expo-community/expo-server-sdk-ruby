@@ -8,7 +8,6 @@ module Exponent
   end
 
   module Push
-    Error = Class.new(StandardError)
 
     class Client
 
@@ -27,7 +26,7 @@ module Exponent
       def handle_response(response)
         case response.code.to_s
         when /(^4|^5)/
-          raise Error, build_error_from_failure(parse_json(response))
+          raise build_error_from_failure(parse_json(response))
         else
           handle_success(parse_json(response))
         end
@@ -44,8 +43,13 @@ module Exponent
       end
 
       def extract_error_from_response(response)
-        error = response.fetch('errors').first { unknown_error_format(response) }
-        "#{error.fetch('code')} -> #{error.fetch('message')}"
+        error = response.fetch('errors').first
+        error_name = error.fetch('code')
+        message = error.fetch('message')
+
+        validate_error_name(Exponent::Push.error_names.include?(error_name)) do
+          Exponent::Push.const_get("#{error_name}Error")
+        end.new(message)
       end
 
       def build_error_with_handling(response)
@@ -68,18 +72,19 @@ module Exponent
 
       def headers
         {
-          'Content-Type'    => 'application/json',
-          'Accept'          => 'application/json'
+          'Content-Type' => 'application/json',
+          'Accept'       => 'application/json'
         }
       end
 
       def handle_success(response)
-        data = extract_data(response)
-        if data.fetch('status') == 'ok'
-          data
-        else
-          raise Error, build_error_from_success(response)
+        extract_data(response).tap do |data|
+          validate_status(data.fetch('status'), response)
         end
+      end
+
+      def validate_status(status, response)
+        raise build_error_from_success(response) unless status == 'ok'
       end
 
       def build_error_from_success(response)
@@ -89,14 +94,20 @@ module Exponent
       end
 
       def extract_error_from_success(response)
-        data = extract_data(response)
+        data    = extract_data(response)
         message = data.fetch('message')
 
-        if data['details']
-          "#{data.fetch('details').fetch('error')} -> #{message}"
-        else
-          "#{data.fetch('status')} -> #{message}"
+        get_error_class(data.fetch('details').fetch('error')).new(message)
+      end
+
+      def get_error_class(error_name)
+        validate_error_name(Exponent::Push.error_names.include?(error_name)) do
+          Exponent::Push.const_get("#{error_name}Error")
         end
+      end
+
+      def validate_error_name(condition)
+        condition ? yield : Exponent::Push::UnknownError
       end
 
       def extract_data(response)
@@ -104,8 +115,20 @@ module Exponent
       end
 
       def unknown_error_format(response)
-        "Unknown error format: #{response}"
+        Exponent::Push::UnknownError.new("Unknown error format: #{response}")
       end
+    end
+
+    Error = Class.new(StandardError)
+
+    def self.error_names
+      %w[DeviceNotRegistered MessageTooBig
+         MessageRateExceeded InvalidCredentials
+         Unknown]
+    end
+
+    error_names.each do |error_name|
+      const_set "#{error_name}Error", Class.new(Error)
     end
   end
 end
