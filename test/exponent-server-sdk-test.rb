@@ -22,11 +22,11 @@ class ExponentServerSdkTest < Minitest::Test
   def test_publish_with_error
     @response_mock.expect(:code, 400)
     @response_mock.expect(:body, error_body.to_json)
-    message = 'INTERNAL_SERVER_ERROR -> An unknown error occurred.'
+    message = 'An unknown error occurred.'
 
     @mock.expect(:post, @response_mock, client_args)
 
-    exception = assert_raises Exponent::Push::Error do
+    exception = assert_raises Exponent::Push::UnknownError do
       @exponent.publish(messages)
     end
 
@@ -38,11 +38,11 @@ class ExponentServerSdkTest < Minitest::Test
   def test_publish_with_success_and_errors
     @response_mock.expect(:code, 200)
     @response_mock.expect(:body, success_with_error_body.to_json)
-    message = 'DeviceNotRegistered -> "ExponentPushToken[42]" is not a registered push notification recipient'
+    message = '"ExponentPushToken[42]" is not a registered push notification recipient'
 
     @mock.expect(:post, @response_mock, client_args)
 
-    exception = assert_raises Exponent::Push::Error do
+    exception = assert_raises Exponent::Push::DeviceNotRegisteredError do
       @exponent.publish(messages)
     end
 
@@ -54,15 +54,14 @@ class ExponentServerSdkTest < Minitest::Test
   def test_publish_with_success_and_apn_error
     @response_mock.expect(:code, 200)
     @response_mock.expect(:body, success_with_apn_error_body.to_json)
-    message = 'error -> Could not find APNs credentials for you (your_app). Check whether you are trying to send a notification to a detached app.'
 
     @mock.expect(:post, @response_mock, client_args)
 
-    exception = assert_raises Exponent::Push::Error do
+    exception = assert_raises Exponent::Push::UnknownError do
       @exponent.publish(messages)
     end
 
-    assert_equal(message, exception.message)
+    assert_match(/Unknown error format/, exception.message)
 
     @mock.verify
   end
