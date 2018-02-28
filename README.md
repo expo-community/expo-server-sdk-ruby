@@ -3,8 +3,6 @@
 
 Use to send push notifications to Exponent Experiences from a Ruby server.
 
-If you have problems with the code in this repository, please file issues & bug reports at https://github.com/expo/expo. Thanks!
-
 ## Installation
 
 Add this line to your application's Gemfile:
@@ -32,7 +30,7 @@ $ gem install exponent-server-sdk
 The push client is the preferred way.  This hits the latest version of the api.
 
 ```ruby
-exponent = Exponent::Push::Client.new
+client = Exponent::Push::Client.new
 
 messages = [{
   to: "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]",
@@ -44,7 +42,12 @@ messages = [{
   body: "You've got mail"
 }]
 
-exponent.publish messages
+client.publish messages
 ```
 
-The complete format of the messages can be found [here.](https://docs.expo.io/versions/v16.0.0/guides/push-notifications.html#http2-api)
+The complete format of the messages can be found [here.](https://docs.expo.io/versions/latest/index.html#http2-api)
+
+## Contributing
+
+If you have problems with the code in this repository, please file issues & bug reports. We encourage you
+to submit a solution or a failing test to reproduce your issue. Thanks!
