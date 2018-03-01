@@ -50,4 +50,4 @@ The complete format of the messages can be found [here.](https://docs.expo.io/ve
 ## Contributing
 
 If you have problems with the code in this repository, please file issues & bug reports. We encourage you
-to submit a solution or a failing test to reproduce your issue. Thanks!
+to submit a pull request with a solution or a failing test to reproduce your issue. Thanks!
