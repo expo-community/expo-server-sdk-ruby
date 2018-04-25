@@ -46,7 +46,7 @@ messages = [{
 client.publish messages
 ```
 
-The complete format of the messages can be found [here.](https://docs.expo.io/versions/latest/index.html#http2-api)
+The complete format of the messages can be found [here.](https://docs.expo.io/versions/latest/guides/push-notifications#message-format)
 
 ## Contributing
 
