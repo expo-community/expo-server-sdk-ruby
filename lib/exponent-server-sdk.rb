@@ -110,7 +110,7 @@ module Exponent
       end
 
       def from_erroneous_response(response)
-        error      = response.fetch('errors').first
+        error      = extract_key(response, 'errors')
         error_name = error.fetch('code')
         message    = error.fetch('message')
 
@@ -118,7 +118,7 @@ module Exponent
       end
 
       def from_successful_response(response)
-        data    = response.fetch('data').first
+        data    = extract_key(response, 'data')
         message = data.fetch('message')
 
         get_error_class(data.fetch('details').fetch('error')).new(message)
@@ -136,6 +136,13 @@ module Exponent
 
       def unknown_error_format(response)
         Exponent::Push::UnknownError.new("Unknown error format: #{response}")
+      end
+
+      def extract_key(object, key)
+        key_response = object.fetch(key)
+        return key_response.first if key_response.is_a? Array
+
+        key_response
       end
     end
 
