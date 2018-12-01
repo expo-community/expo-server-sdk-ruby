@@ -30,8 +30,12 @@ $ gem install exponent-server-sdk
 
 The push client is the preferred way.  This hits the latest version of the api.
 
+Optional arguments: `gzip: true` 
+
+
 ```ruby
 client = Exponent::Push::Client.new
+# client = Exponent::Push::Client.new(gzip: true)  # for compressed, faster requests
 
 messages = [{
   to: "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]",
