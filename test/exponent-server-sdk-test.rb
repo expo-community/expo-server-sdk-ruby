@@ -5,7 +5,8 @@ class ExponentServerSdkTest < Minitest::Test
   def setup
     @mock = MiniTest::Mock.new
     @response_mock = MiniTest::Mock.new
-    @exponent = Exponent::Push::Client.new(@mock)
+    @exponent = Exponent::Push::Client.new(http_client: @mock)
+    @exponent_gzip = Exponent::Push::Client.new(http_client: @mock, gzip: true)
   end
 
   def test_publish_with_success
@@ -15,6 +16,28 @@ class ExponentServerSdkTest < Minitest::Test
     @mock.expect(:post, @response_mock, client_args)
 
     @exponent.publish(messages)
+
+    @mock.verify
+  end
+
+  def test_publish_with_gzip_success
+    @response_mock.expect(:code, 200)
+    @response_mock.expect(:body, success_body.to_json)
+
+    @mock.expect(:post, @response_mock, gzip_client_args)
+
+    @exponent_gzip.publish(messages)
+
+    @mock.verify
+  end
+
+  def test_publish_with_gzip
+    @response_mock.expect(:code, 200)
+    @response_mock.expect(:body, success_body.to_json)
+
+    @mock.expect(:post, @response_mock, gzip_client_args)
+
+    @exponent_gzip.publish(messages)
 
     @mock.verify
   end
@@ -166,6 +189,20 @@ class ExponentServerSdkTest < Minitest::Test
         headers: {
           'Content-Type' => 'application/json',
           'Accept' => 'application/json'
+        }
+      }
+    ]
+  end
+
+  def gzip_client_args
+    [
+      'https://exp.host/--/api/v2/push/send',
+      {
+        body: messages.to_json,
+        headers: {
+          'Content-Type' => 'application/json',
+          'Accept' => 'application/json',
+          'Accept-Encoding' => 'gzip, deflate'
         }
       }
     ]

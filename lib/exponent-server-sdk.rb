@@ -10,10 +10,10 @@ module Exponent
   module Push
 
     class Client
-      def initialize(http_client      = Typhoeus,
-                     response_handler = ResponseHandler.new)
-        @http_client      = http_client
-        @response_handler = response_handler
+      def initialize(**args)
+        @http_client      = args[:http_client] || Typhoeus
+        @response_handler = args[:response_handler] || ResponseHandler.new
+        @gzip = args[:gzip] == true
       end
 
       def publish(messages)
@@ -37,10 +37,12 @@ module Exponent
       end
 
       def headers
-        {
+        headers = {
           'Content-Type' => 'application/json',
           'Accept'       => 'application/json'
         }
+        headers['Accept-Encoding'] = 'gzip, deflate' if @gzip
+        headers
       end
     end
 
