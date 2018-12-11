@@ -17,6 +17,7 @@ module Exponent
       end
 
       def publish(messages)      
+        pp "publish"
         response_handler.handle(push_notifications(messages))
       end
 
