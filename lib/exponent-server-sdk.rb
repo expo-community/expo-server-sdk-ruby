@@ -17,7 +17,6 @@ module Exponent
       end
 
       def publish(messages)      
-        pp "publish"
         response_handler.handle(push_notifications(messages))
       end
 
@@ -55,7 +54,7 @@ module Exponent
         when /(^4|^5)/
           raise build_error_from_failure(parse_json(response))
         else
-          build_status_from_success(parse_json(response))
+          parse_json(response)
         end
       end
 
@@ -71,9 +70,9 @@ module Exponent
         error_builder.build_from_erroneous(response)
       end
 
-      def build_status_from_success(response)
-        error_builder.build_from_successful(response)
-      end
+      # def build_status_from_success(response)
+      #   error_builder.build_from_successful(response)
+      # end
     end
 
     class ErrorBuilder
@@ -101,25 +100,26 @@ module Exponent
         get_error_class(error_name).new(message)
       end
 
-      def from_successful_response(response)
-        data = response.fetch('data')
-        data = data.is_a?(Array) ? data : [data]
+      # def from_successful_response(response)
+      #   data = response.fetch('data')
+      #   data = data.is_a?(Array) ? data : [data]
 
-        data.reduce([]) do |errors, status|
-          if status.fetch("status") != 'ok'
-            errors << format_success_status(status)
-          end
-          errors
-        end
-      end
+      #   data.reduce([]) do |statuses, status|
+      #     if status.fetch("status") == 'ok'
 
-      def format_success_status(status)
-        { 
-          error: status.fetch("details").fetch("error"),
-          message: status.fetch("message"),
-          push_token: status.fetch("message")[/ExponentPushToken\[.*\]/]
-        }
-      end
+      #       statuses << format_success_status(status)
+      #     end
+      #     errors
+      #   end
+      # end
+
+      # def format_success_status(status)
+      #   { 
+      #     error: status.fetch("details").fetch("error"),
+      #     message: status.fetch("message"),
+      #     push_token: status.fetch("message")[/ExponentPushToken\[.*\]/]
+      #   }
+      # end
 
       def validate_error_name(condition)
         condition ? yield : Exponent::Push::UnknownError
