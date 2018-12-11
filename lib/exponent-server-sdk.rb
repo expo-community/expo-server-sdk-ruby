@@ -16,7 +16,7 @@ module Exponent
         @response_handler = response_handler
       end
 
-      def publish(messages)
+      def publish(messages)      
         response_handler.handle(push_notifications(messages))
       end
 
@@ -54,7 +54,7 @@ module Exponent
         when /(^4|^5)/
           raise build_error_from_failure(parse_json(response))
         else
-          handle_success(parse_json(response))
+          build_status_from_success(parse_json(response))
         end
       end
 
@@ -70,21 +70,7 @@ module Exponent
         error_builder.build_from_erroneous(response)
       end
 
-      def handle_success(response)
-        extract_data(response).tap do |data|
-          validate_status(data.fetch('status'), response)
-        end
-      end
-
-      def extract_data(response)
-        response.fetch('data').first
-      end
-
-      def validate_status(status, response)
-        raise build_error_from_success(response) unless status == 'ok'
-      end
-
-      def build_error_from_success(response)
+      def build_status_from_success(response)
         error_builder.build_from_successful(response)
       end
     end
@@ -115,10 +101,23 @@ module Exponent
       end
 
       def from_successful_response(response)
-        data    = response.fetch('data').first
-        message = data.fetch('message')
+        data = response.fetch('data')
+        data = data.is_a?(Array) ? data : [data]
 
-        get_error_class(data.fetch('details').fetch('error')).new(message)
+        data.reduce([]) do |errors, status|
+          if status.fetch("status") != 'ok'
+            errors << format_success_status(status)
+          end
+          errors
+        end
+      end
+
+      def format_success_status(status)
+        { 
+          error: status.fetch("details").fetch("error"),
+          message: status.fetch("message"),
+          push_token: status.fetch("message")[/ExponentPushToken\[.*\]/]
+        }
       end
 
       def validate_error_name(condition)
