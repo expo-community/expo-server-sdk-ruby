@@ -16,7 +16,7 @@ module Exponent
         @response_handler = response_handler
       end
 
-      def publish(messages)      
+      def publish(messages)
         response_handler.handle(push_notifications(messages))
       end
 
@@ -54,6 +54,9 @@ module Exponent
         when /(^4|^5)/
           raise build_error_from_failure(parse_json(response))
         else
+          # Return all responses to allow indexing with the input messages.
+          # Since the API doesn't return push tokens with error messags, this
+          # is the only way to identify which error corresponds to which token.
           parse_json(response).fetch("data")
         end
       end
