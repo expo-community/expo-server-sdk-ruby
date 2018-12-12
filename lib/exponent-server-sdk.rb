@@ -55,7 +55,7 @@ module Exponent
           raise build_error_from_failure(parse_json(response))
         else
           # Return all responses to allow indexing with the input messages.
-          # Since the API doesn't return push tokens with error messags, this
+          # Since the API doesn't return push tokens with error messages, this
           # is the only way to identify which error corresponds to which token.
           parse_json(response).fetch("data")
         end
