@@ -54,7 +54,10 @@ module Exponent
         when /(^4|^5)/
           raise build_error_from_failure(parse_json(response))
         else
-          handle_success(parse_json(response))
+          # Return all responses to allow indexing with the input messages.
+          # Since the API doesn't return push tokens with error messages, this
+          # is the only way to identify which error corresponds to which token.
+          parse_json(response).fetch("data")
         end
       end
 
@@ -68,24 +71,6 @@ module Exponent
 
       def build_error_from_failure(response)
         error_builder.build_from_erroneous(response)
-      end
-
-      def handle_success(response)
-        extract_data(response).tap do |data|
-          validate_status(data.fetch('status'), response)
-        end
-      end
-
-      def extract_data(response)
-        response.fetch('data').first
-      end
-
-      def validate_status(status, response)
-        raise build_error_from_success(response) unless status == 'ok'
-      end
-
-      def build_error_from_success(response)
-        error_builder.build_from_successful(response)
       end
     end
 
@@ -112,13 +97,6 @@ module Exponent
         message    = error.fetch('message')
 
         get_error_class(error_name).new(message)
-      end
-
-      def from_successful_response(response)
-        data    = response.fetch('data').first
-        message = data.fetch('message')
-
-        get_error_class(data.fetch('details').fetch('error')).new(message)
       end
 
       def validate_error_name(condition)
