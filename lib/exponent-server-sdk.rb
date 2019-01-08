@@ -79,7 +79,12 @@ module Exponent
       end
 
       def extract_data(response)
-        response.fetch('data').first
+        data = response.fetch('data')
+        if data.class == Array
+          data.first
+        else
+          data
+        end
       end
 
       def validate_status(status, response)
