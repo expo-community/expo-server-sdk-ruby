@@ -73,17 +73,19 @@ module Exponent
       end
 
       def handle_success(response)
-        extract_data(response).tap do |data|
-          validate_status(data.fetch('status'), response)
-        end
+        extract_data(response)
       end
 
       def extract_data(response)
         data = response.fetch('data')
-        if data.class == Array
-          data.first
-        else
+        if data.is_a? Hash
+          validate_status(data.fetch('status'), response)
           data
+        else
+          data.map do |receipt|
+            validate_status(receipt.fetch('status'), response)
+            receipt
+          end
         end
       end
 
