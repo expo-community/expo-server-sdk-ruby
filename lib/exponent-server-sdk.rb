@@ -52,11 +52,12 @@ module Exponent
       end
 
       def handle(response)
+        @response = response
         case response.code.to_s
         when /(^4|^5)/
-          raise build_error_from_failure(parse_json(response))
+          raise build_error_from_failure
         else
-          handle_success(parse_json(response))
+          @response
         end
       end
 
@@ -64,38 +65,49 @@ module Exponent
 
       attr_reader :error_builder
 
-      def parse_json(response)
-        JSON.parse(response.body)
-      end
-
-      def build_error_from_failure(response)
-        error_builder.build_from_erroneous(response)
-      end
-
-      def handle_success(response)
-        extract_data(response)
-      end
-
-      def extract_data(response)
-        data = response.fetch('data')
-        if data.is_a? Hash
-          validate_status(data.fetch('status'), response)
-          data
+      def response_body
+        if @gzip
+          @body ||= JSON.parse(@response.body.to_json)
         else
-          data.map do |receipt|
-            validate_status(receipt.fetch('status'), response)
-            receipt
+          @body ||= JSON.parse(@response.body)
           end
+      end
+
+      def build_error_from_failure
+        error_builder.build_from_erroneous(response_body)
+      end
+
+      def failed_messages
+        data = response_body.dig('data')
+        messages = []
+        return messages if data.nil?
+
+        data.each do |receipt|
+          next if receipt.dig('status') == 'ok'
+          messages.push(receipt)
         end
       end
 
-      def validate_status(status, response)
-        raise build_error_from_success(response) unless status == 'ok'
-      end
+      # def extract_data
+      #   data = response_body.dig('data')
+      #   if data.is_a? Hash
+      #     validate_status(data.dig('status'), response)
+      #     data
+      #   else
+      #     data.map do |receipt|
+      #       validate_status(receipt.dig('status'), response)
+      #       receipt
+      #     end
+      #   end
+      # end
 
-      def build_error_from_success(response)
-        error_builder.build_from_successful(response)
-      end
+      # def validate_status(status, response)
+      #   raise build_error_from_success(response) unless status == 'ok'
+      # end
+      #
+      # def build_error_from_success(response)
+      #   error_builder.build_from_successful(response)
+      # end
     end
 
     class ErrorBuilder
