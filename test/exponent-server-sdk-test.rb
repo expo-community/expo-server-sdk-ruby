@@ -3,11 +3,233 @@ require 'exponent-server-sdk'
 
 class ExponentServerSdkTest < Minitest::Test
   def setup
-    @mock = MiniTest::Mock.new
+    @mock          = MiniTest::Mock.new
     @response_mock = MiniTest::Mock.new
-    @exponent = Exponent::Push::Client.new(http_client: @mock)
-    @exponent_gzip = Exponent::Push::Client.new(http_client: @mock, gzip: true)
+    @client        = Exponent::Push::Client.new(http_client: @mock)
+    @client_gzip   = Exponent::Push::Client.new(http_client: @mock, gzip: true)
   end
+
+  def test_send_messages_with_success
+    @response_mock.expect(:code, 200)
+    @response_mock.expect(:body, success_body.to_json)
+
+    @mock.expect(:post, @response_mock, client_args)
+
+    response = @client.send_messages(messages)
+    assert_equal(response.errors?, false)
+
+    @mock.verify
+  end
+
+  def test_send_messages_with_gzip_success
+    @response_mock.expect(:code, 200)
+    @response_mock.expect(:body, success_body.to_json)
+
+    @mock.expect(:post, @response_mock, gzip_client_args)
+
+    response = @client_gzip.send_messages(messages)
+    assert_equal(response.errors?, false)
+
+    @mock.verify
+  end
+
+  def test_send_messages_with_empty_string_response
+    @response_mock.expect(:code, 400)
+    @response_mock.expect(:body, '')
+
+    @mock.expect(:post, @response_mock, client_args)
+
+    exception = assert_raises Exponent::Push::UnknownError do
+      handler = @client.send_messages(messages)
+      # this first assertion is just stating that errors will be false when
+      # an exception is thrown on the request, not the content of the request
+      # 400/500 level errors are not delivery errors, they are functionality errors
+      assert_equal(handler.response.errors?, false)
+      assert_equal(handler.response.body, {})
+      assert_equal(handler.response.code, 400)
+    end
+
+    assert_match(/Unknown error format/, exception.message)
+
+    @mock.verify
+  end
+
+  def test_send_messages_with_gzip_empty_string_response
+    @response_mock.expect(:code, 400)
+    @response_mock.expect(:body, '')
+
+    @mock.expect(:post, @response_mock, gzip_client_args)
+
+    exception = assert_raises Exponent::Push::UnknownError do
+      handler = @client_gzip.send_messages(messages)
+      # this first assertion is just stating that errors will be false when
+      # an exception is thrown on the request, not the content of the request
+      # 400/500 level errors are not delivery errors, they are functionality errors
+      assert_equal(handler.response.errors?, false)
+      assert_equal(handler.response.body, {})
+      assert_equal(handler.response.code, 400)
+    end
+
+    assert_match(/Unknown error format/, exception.message)
+
+    @mock.verify
+  end
+
+  def test_send_messages_with_unknown_error
+    @response_mock.expect(:code, 400)
+    @response_mock.expect(:body, error_body.to_json)
+
+    @mock.expect(:post, @response_mock, client_args)
+
+    exception = assert_raises Exponent::Push::UnknownError do
+      @client.send_messages(messages)
+    end
+
+    assert_match(/Unknown error format/, exception.message)
+
+    @mock.verify
+  end
+
+  def test_send_messages_with_gzip_unknown_error
+    @response_mock.expect(:code, 400)
+    @response_mock.expect(:body, error_body.to_json)
+
+    @mock.expect(:post, @response_mock, gzip_client_args)
+
+    exception = assert_raises Exponent::Push::UnknownError do
+      @client_gzip.send_messages(messages)
+    end
+
+    assert_match(/Unknown error format/, exception.message)
+
+    @mock.verify
+  end
+
+  def test_send_messages_with_device_not_registered_error
+    @response_mock.expect(:code, 200)
+    @response_mock.expect(:body, not_registered_device_error_body.to_json)
+    token   = 'ExponentPushToken[42]'
+    message = "\"#{token}\" is not a registered push notification recipient"
+
+    @mock.expect(:post, @response_mock, client_args)
+
+    response_handler = @client.send_messages(messages)
+    assert_equal(message, response_handler.errors.first.message)
+    assert(response_handler.errors.first.instance_of?(Exponent::Push::DeviceNotRegisteredError))
+    assert(response_handler.invalid_push_tokens.include?(token))
+    assert(response_handler.errors?)
+
+
+    @mock.verify
+  end
+
+  def test_send_messages_with_message_too_big_error
+    @response_mock.expect(:code, 200)
+    @response_mock.expect(:body, message_too_big_error_body.to_json)
+    message = 'Message too big'
+
+    @mock.expect(:post, @response_mock, client_args)
+
+    response_handler = @client.send_messages(messages)
+    assert(response_handler.errors.first.instance_of?(Exponent::Push::MessageTooBigError))
+    assert_equal(message, response_handler.errors.first.message)
+    assert(response_handler.errors?)
+
+    @mock.verify
+  end
+
+  def test_send_messages_with_message_rate_exceeded_error
+    @response_mock.expect(:code, 200)
+    @response_mock.expect(:body, message_rate_exceeded_error_body.to_json)
+    message = 'Message rate exceeded'
+
+    @mock.expect(:post, @response_mock, client_args)
+
+    response_handler = @client.send_messages(messages)
+    assert(response_handler.errors.first.instance_of?(Exponent::Push::MessageRateExceededError))
+    assert_equal(message, response_handler.errors.first.message)
+
+    @mock.verify
+  end
+
+  def test_send_messages_with_invalid_credentials_error
+    @response_mock.expect(:code, 200)
+    @response_mock.expect(:body, invalid_credentials_error_body.to_json)
+    message = 'Invalid credentials'
+
+    @mock.expect(:post, @response_mock, client_args)
+
+    response_handler = @client.send_messages(messages)
+    assert(response_handler.errors.first.instance_of?(Exponent::Push::InvalidCredentialsError))
+    assert_equal(message, response_handler.errors.first.message)
+
+    @mock.verify
+  end
+
+  def test_send_messages_with_apn_error
+    @response_mock.expect(:code, 200)
+    @response_mock.expect(:body, apn_error_body.to_json)
+
+    @mock.expect(:post, @response_mock, client_args)
+
+    response_handler = @client.send_messages(messages)
+    assert(response_handler.errors.first.instance_of?(Exponent::Push::UnknownError))
+    assert_match(/Unknown error format/, response_handler.errors.first.message)
+
+    @mock.verify
+  end
+
+
+  def test_get_receipts_with_success_receipt
+    @response_mock.expect(:code, 200)
+    @response_mock.expect(:body, receipt_success_body.to_json)
+    receipt_ids = [success_receipt]
+
+    @mock.expect(:post, @response_mock, receipt_client_args(receipt_ids))
+
+    response_handler = @client.verify_deliveries(receipt_ids)
+    assert_match(success_receipt, response_handler.receipt_ids.first)
+
+    @mock.verify
+  end
+
+  def test_get_receipts_with_error_receipt
+    @response_mock.expect(:code, 200)
+    @response_mock.expect(:body, receipt_error_body.to_json)
+    receipt_ids = [error_receipt]
+
+    @mock.expect(:post, @response_mock, receipt_client_args(receipt_ids))
+
+    response_handler = @client.verify_deliveries(receipt_ids)
+    assert_match(error_receipt, response_handler.receipt_ids.first)
+    assert_equal(true, response_handler.errors?)
+    assert_equal(1, response_handler.errors.count)
+    assert(response_handler.errors.first.instance_of?(Exponent::Push::DeviceNotRegisteredError))
+
+    @mock.verify
+  end
+
+
+  def test_get_receipts_with_variable_success_receipts
+    @response_mock.expect(:code, 200)
+    @response_mock.expect(:body, multiple_receipts.to_json)
+    receipt_ids = [error_receipt,success_receipt]
+
+    @mock.expect(:post, @response_mock, receipt_client_args(receipt_ids))
+
+    response_handler = @client.verify_deliveries(receipt_ids)
+    assert_match(error_receipt, response_handler.receipt_ids.first)
+    assert_match(success_receipt, response_handler.receipt_ids.last)
+    assert_equal(true, response_handler.errors?)
+    assert_equal(1, response_handler.errors.count)
+    assert(response_handler.errors.first.instance_of?(Exponent::Push::DeviceNotRegisteredError))
+
+    @mock.verify
+  end
+
+
+
+  # DEPRECATED -- TESTS BELOW HERE RELATE TO CODE THAT WILL BE REMOVED
 
   def test_publish_with_success
     @response_mock.expect(:code, 200)
@@ -15,7 +237,7 @@ class ExponentServerSdkTest < Minitest::Test
 
     @mock.expect(:post, @response_mock, client_args)
 
-    @exponent.publish(messages)
+    @client.publish(messages)
 
     @mock.verify
   end
@@ -26,7 +248,7 @@ class ExponentServerSdkTest < Minitest::Test
 
     @mock.expect(:post, @response_mock, gzip_client_args)
 
-    @exponent_gzip.publish(messages)
+    @client_gzip.publish(messages)
 
     @mock.verify
   end
@@ -37,7 +259,7 @@ class ExponentServerSdkTest < Minitest::Test
 
     @mock.expect(:post, @response_mock, gzip_client_args)
 
-    @exponent_gzip.publish(messages)
+    @client_gzip.publish(messages)
 
     @mock.verify
   end
@@ -50,7 +272,7 @@ class ExponentServerSdkTest < Minitest::Test
     @mock.expect(:post, @response_mock, client_args)
 
     exception = assert_raises Exponent::Push::UnknownError do
-      @exponent.publish(messages)
+      @client.publish(messages)
     end
 
     assert_equal(message, exception.message)
@@ -66,7 +288,7 @@ class ExponentServerSdkTest < Minitest::Test
     @mock.expect(:post, @response_mock, client_args)
 
     exception = assert_raises Exponent::Push::DeviceNotRegisteredError do
-      @exponent.publish(messages)
+      @client.publish(messages)
     end
 
     assert_equal(message, exception.message)
@@ -82,7 +304,7 @@ class ExponentServerSdkTest < Minitest::Test
     @mock.expect(:post, @response_mock, client_args)
 
     exception = assert_raises Exponent::Push::MessageTooBigError do
-      @exponent.publish(messages)
+      @client.publish(messages)
     end
 
     assert_equal(message, exception.message)
@@ -98,7 +320,7 @@ class ExponentServerSdkTest < Minitest::Test
     @mock.expect(:post, @response_mock, client_args)
 
     exception = assert_raises Exponent::Push::MessageRateExceededError do
-      @exponent.publish(messages)
+      @client.publish(messages)
     end
 
     assert_equal(message, exception.message)
@@ -114,7 +336,7 @@ class ExponentServerSdkTest < Minitest::Test
     @mock.expect(:post, @response_mock, client_args)
 
     exception = assert_raises Exponent::Push::InvalidCredentialsError do
-      @exponent.publish(messages)
+      @client.publish(messages)
     end
 
     assert_equal(message, exception.message)
@@ -129,7 +351,7 @@ class ExponentServerSdkTest < Minitest::Test
     @mock.expect(:post, @response_mock, client_args)
 
     exception = assert_raises Exponent::Push::UnknownError do
-      @exponent.publish(messages)
+      @client.publish(messages)
     end
 
     assert_match(/Unknown error format/, exception.message)
@@ -140,15 +362,64 @@ class ExponentServerSdkTest < Minitest::Test
   private
 
   def success_body
-    { 'data' => [{ 'status' => 'ok' }] }
+    {'data' => [{'status' => 'ok'}]}
+  end
+
+  def success_receipt
+    'YYYYYYYY-YYYY-YYYY-YYYY-YYYYYYYYYYYY'
+  end
+
+  def error_receipt
+    'XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX'
+  end
+
+  def receipt_success_body
+    {
+        'data' => {
+            'YYYYYYYY-YYYY-YYYY-YYYY-YYYYYYYYYYYY' => {
+                'status' => 'ok'
+            }
+        }
+    }
+  end
+
+  def receipt_error_body
+    {
+        'data' => {
+            'XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX' => {
+                'status'  => 'error',
+                'message' => 'The Apple Push Notification service failed to send the notification',
+                'details' => {
+                    'error' => 'DeviceNotRegistered'
+                }
+            }
+        }
+    }
+  end
+
+  def multiple_receipts
+    {
+        'data' => {
+            'XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX' => {
+                'status'  => 'error',
+                'message' => 'The Apple Push Notification service failed to send the notification',
+                'details' => {
+                    'error' => 'DeviceNotRegistered'
+                }
+            },
+            'YYYYYYYY-YYYY-YYYY-YYYY-YYYYYYYYYYYY' => {
+                'status' => 'ok'
+            }
+        }
+    }
   end
 
   def error_body
     {
-      'errors' => [{
-        'code' => 'INTERNAL_SERVER_ERROR',
-        'message' => 'An unknown error occurred.'
-      }]
+        'errors' => [{
+                         'code'    => 'INTERNAL_SERVER_ERROR',
+                         'message' => 'An unknown error occurred.'
+                     }]
     }
   end
 
@@ -158,8 +429,8 @@ class ExponentServerSdkTest < Minitest::Test
 
   def not_registered_device_error_body
     build_error_body(
-      'DeviceNotRegistered',
-      '"ExponentPushToken[42]" is not a registered push notification recipient'
+        'DeviceNotRegistered',
+        '"ExponentPushToken[42]" is not a registered push notification recipient'
     )
   end
 
@@ -173,60 +444,74 @@ class ExponentServerSdkTest < Minitest::Test
 
   def apn_error_body
     {
-      'data' => [{
-        'status' => 'error',
-        'message' =>
-          'Could not find APNs credentials for you (your_app). Check whether you are trying to send a notification to a detached app.'
-      }]
+        'data' => [{
+                       'status'  => 'error',
+                       'message' =>
+                           'Could not find APNs credentials for you (your_app). Check whether you are trying to send a notification to a detached app.'
+                   }]
     }
   end
 
   def client_args
     [
-      'https://exp.host/--/api/v2/push/send',
-      {
-        body: messages.to_json,
-        headers: {
-          'Content-Type' => 'application/json',
-          'Accept' => 'application/json'
+        'https://exp.host/--/api/v2/push/send',
+        {
+            body:    messages.to_json,
+            headers: {
+                'Content-Type' => 'application/json',
+                'Accept'       => 'application/json'
+            }
         }
-      }
     ]
   end
 
   def gzip_client_args
     [
-      'https://exp.host/--/api/v2/push/send',
-      {
-        body: messages.to_json,
-        headers: {
-          'Content-Type' => 'application/json',
-          'Accept' => 'application/json',
-          'Accept-Encoding' => 'gzip, deflate'
+        'https://exp.host/--/api/v2/push/send',
+        {
+            body:    messages.to_json,
+            headers: {
+                'Content-Type'    => 'application/json',
+                'Accept'          => 'application/json',
+                'Accept-Encoding' => 'gzip, deflate'
+            }
         }
-      }
     ]
   end
 
+  def receipt_client_args(receipt_ids)
+    [
+        'https://exp.host/--/api/v2/push/getReceipts',
+        {
+            body:    {ids: receipt_ids}.to_json,
+            headers: {
+                'Content-Type' => 'application/json',
+                'Accept'       => 'application/json'
+            }
+        }
+    ]
+  end
+  
+
   def messages
     [{
-      to: 'ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]',
-      sound: 'default',
-      body: 'Hello world!'
-    }, {
-      to: 'ExponentPushToken[yyyyyyyyyyyyyyyyyyyyyy]',
-      badge: 1,
-      body: "You've got mail"
-    }]
+         to:    'ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]',
+         sound: 'default',
+         body:  'Hello world!'
+     }, {
+         to:    'ExponentPushToken[yyyyyyyyyyyyyyyyyyyyyy]',
+         badge: 1,
+         body:  "You've got mail"
+     }]
   end
 
   def build_error_body(error_code, message)
     {
-      'data' => [{
-        'status' => 'error',
-        'message' => message,
-        'details' => { 'error' => error_code }
-      }]
+        'data' => [{
+                       'status'  => 'error',
+                       'message' => message,
+                       'details' => {'error' => error_code}
+                   }]
     }
   end
 end
