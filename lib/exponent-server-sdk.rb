@@ -46,10 +46,11 @@ module Exponent
         @gzip             = args[:gzip] == true
       end
 
-      warn "[DEPRECATION] `publish` is deprecated. Please use `send_messages` instead."
+
       # returns a string response with parsed success json or error
       # @deprecated
       def publish(messages)
+        warn "[DEPRECATION] `publish` is deprecated. Please use `send_messages` instead."
         @response_handler.handle(push_notifications(messages))
       end
 
