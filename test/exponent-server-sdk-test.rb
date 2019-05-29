@@ -33,9 +33,30 @@ class ExponentServerSdkTest < Minitest::Test
     @mock.verify
   end
 
-  def test_send_messages_with_empty_string_response
+  def test_send_messages_with_empty_string_response_body
     @response_mock.expect(:code, 400)
     @response_mock.expect(:body, '')
+
+    @mock.expect(:post, @response_mock, client_args)
+
+    exception = assert_raises Exponent::Push::UnknownError do
+      handler = @client.send_messages(messages)
+      # this first assertion is just stating that errors will be false when
+      # an exception is thrown on the request, not the content of the request
+      # 400/500 level errors are not delivery errors, they are functionality errors
+      assert_equal(handler.response.errors?, false)
+      assert_equal(handler.response.body, {})
+      assert_equal(handler.response.code, 400)
+    end
+
+    assert_match(/Unknown error format/, exception.message)
+
+    @mock.verify
+  end
+
+  def test_send_messages_with_nil_response_body
+    @response_mock.expect(:code, 400)
+    @response_mock.expect(:body, nil)
 
     @mock.expect(:post, @response_mock, client_args)
 
@@ -57,6 +78,27 @@ class ExponentServerSdkTest < Minitest::Test
   def test_send_messages_with_gzip_empty_string_response
     @response_mock.expect(:code, 400)
     @response_mock.expect(:body, '')
+
+    @mock.expect(:post, @response_mock, gzip_client_args)
+
+    exception = assert_raises Exponent::Push::UnknownError do
+      handler = @client_gzip.send_messages(messages)
+      # this first assertion is just stating that errors will be false when
+      # an exception is thrown on the request, not the content of the request
+      # 400/500 level errors are not delivery errors, they are functionality errors
+      assert_equal(handler.response.errors?, false)
+      assert_equal(handler.response.body, {})
+      assert_equal(handler.response.code, 400)
+    end
+
+    assert_match(/Unknown error format/, exception.message)
+
+    @mock.verify
+  end
+
+  def test_send_messages_with_gzip_nil_response_body
+    @response_mock.expect(:code, 400)
+    @response_mock.expect(:body, nil)
 
     @mock.expect(:post, @response_mock, gzip_client_args)
 
@@ -213,7 +255,7 @@ class ExponentServerSdkTest < Minitest::Test
   def test_get_receipts_with_variable_success_receipts
     @response_mock.expect(:code, 200)
     @response_mock.expect(:body, multiple_receipts.to_json)
-    receipt_ids = [error_receipt,success_receipt]
+    receipt_ids = [error_receipt, success_receipt]
 
     @mock.expect(:post, @response_mock, receipt_client_args(receipt_ids))
 
@@ -226,7 +268,6 @@ class ExponentServerSdkTest < Minitest::Test
 
     @mock.verify
   end
-
 
 
   # DEPRECATED -- TESTS BELOW HERE RELATE TO CODE THAT WILL BE REMOVED
@@ -491,7 +532,7 @@ class ExponentServerSdkTest < Minitest::Test
         }
     ]
   end
-  
+
 
   def messages
     [{

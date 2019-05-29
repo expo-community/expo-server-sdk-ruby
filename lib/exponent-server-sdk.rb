@@ -31,7 +31,6 @@ require 'json'
 # receipt_response = client.verify_deliveries(receipt_ids)
 
 
-
 module Exponent
   def self.is_exponent_push_token?(token)
     token.start_with?('ExponentPushToken')
@@ -41,7 +40,7 @@ module Exponent
 
     class Client
       def initialize(**args)
-        @http_client      = args[:http_client] || Typhoeus
+        @http_client = args[:http_client] || Typhoeus
         # future versions will deprecate this
         @response_handler = args[:response_handler] || ResponseHandler.new
         @gzip             = args[:gzip] == true
@@ -66,7 +65,7 @@ module Exponent
 
       def verify_deliveries(receipt_ids, **args)
         response = get_receipts(receipt_ids)
-        handler = args[:response_handler] || ResponseHandler.new
+        handler  = args[:response_handler] || ResponseHandler.new
         handler.process_response(response)
         handler
       end
@@ -89,7 +88,7 @@ module Exponent
       def get_receipts(receipt_ids)
         @http_client.post(
             receipts_url,
-            body:    { ids: receipt_ids }.to_json,
+            body:    {ids: receipt_ids}.to_json,
             headers: headers
         )
       end
@@ -113,11 +112,11 @@ module Exponent
       attr_reader :response, :invalid_push_tokens, :receipt_ids, :errors
 
       def initialize(error_builder = ErrorBuilder.new)
-        @error_builder = error_builder
-        @response = nil
-        @receipt_ids = []
+        @error_builder       = error_builder
+        @response            = nil
+        @receipt_ids         = []
         @invalid_push_tokens = []
-        @errors = []
+        @errors              = []
       end
 
       def process_response(response)
@@ -150,7 +149,7 @@ module Exponent
       private
 
       def sort_results
-        data     = response_body.fetch('data')
+        data = response_body && response_body.fetch('data', nil) || nil
 
         # something is definitely wrong
         return if data.nil?
@@ -159,9 +158,8 @@ module Exponent
         # Hash indicates a response from the /getReceipts endpoint
         if data.is_a? Array
           data.each do |push_ticket|
-            receipt_id = push_ticket['id']
-            @receipt_ids.push(receipt_id) unless receipt_id.nil?
-            if push_ticket.fetch('status') == 'ok'
+            receipt_id = push_ticket.fetch('id', nil)
+            if push_ticket.fetch('status', nil) == 'ok'
               @receipt_ids.push(receipt_id) unless receipt_id.nil?
             else
               process_error(push_ticket)
@@ -182,8 +180,8 @@ module Exponent
       end
 
       def process_error(push_ticket)
-        message = push_ticket.fetch('message')
-        matches = message.match(/ExponentPushToken\[(...*)\]/)
+        message     = push_ticket.fetch('message')
+        matches     = message.match(/ExponentPushToken\[(...*)\]/)
         error_class = @error_builder.parse_push_ticket(push_ticket)
 
         unless matches.nil?
@@ -306,8 +304,8 @@ module Exponent
 
       # @deprecated
       def from_successful_response(response)
-        delivery_result    = response.fetch('data').first
-        message = delivery_result.fetch('message')
+        delivery_result = response.fetch('data').first
+        message         = delivery_result.fetch('message')
         get_error_class(delivery_result.fetch('details').fetch('error')).new(message)
       end
     end
