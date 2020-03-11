@@ -74,6 +74,30 @@ class ExponentServerSdkTest < Minitest::Test
     @mock.verify
   end
 
+  def test_publish_with_device_not_registered_error_as_second_item
+    @response_mock.expect(:code, 200)
+    @response_mock.expect(:body, {
+      'data' => [
+        { "id" => "147d26ac-ff58-40c4-a468-84eae84079e8", "status" => "ok" },
+        {
+          'id' => '2cbed589-47ac-4fe2-a5bd-c6ba6536925c',
+          'status' => 'error',
+          'message' => 'The recipient device is not registered with FCM.',
+          'details' => { 'error' => 'DeviceNotRegistered', 'fault' => 'developer' }
+        }]
+    }.to_json)
+    @mock.expect(:post, @response_mock, client_args)
+
+    exception = assert_raises Exponent::Push::DeviceNotRegisteredError do
+      @exponent.publish(messages)
+    end
+
+    assert_equal('The recipient device is not registered with FCM.',
+                 exception.message)
+
+    @mock.verify
+  end
+
   def test_publish_with_message_too_big_error
     @response_mock.expect(:code, 200)
     @response_mock.expect(:body, message_too_big_error_body.to_json)

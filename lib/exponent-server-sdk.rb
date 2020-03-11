@@ -124,7 +124,7 @@ module Exponent
       end
 
       def from_successful_response(response)
-        data    = response.fetch('data').first
+        data = response.fetch('data').select { |receipt| receipt['status'] != 'ok' }.first
         message = data.fetch('message')
 
         get_error_class(data.fetch('details').fetch('error')).new(message)
