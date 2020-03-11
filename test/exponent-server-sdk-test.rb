@@ -42,6 +42,54 @@ class ExponentServerSdkTest < Minitest::Test
     @mock.verify
   end
 
+  def test_publish_with_gateway_timeout_error
+    @response_mock.expect(:code, 504)
+    @response_mock.expect(:code, 504)
+    # the server will return an html error instead of a json error, and we should handle it
+    @response_mock.expect(:body, <<~HTML)
+      <html>
+      <head><title>504 Gateway Time-out</title></head>
+      <body>
+      <center><h1>504 Gateway Time-out</h1></center>
+      <hr><center>openresty/1.15.8.2</center>
+      </body>
+      </html>
+    HTML
+    @mock.expect(:post, @response_mock, client_args)
+
+    exception = assert_raises Exponent::Push::UnknownError do
+      @exponent.publish(messages)
+    end
+
+    assert_equal('504 Gateway Time-out', exception.message)
+
+    @mock.verify
+  end
+
+  def test_publish_with_service_unavailable_error
+    @response_mock.expect(:code, 503)
+    @response_mock.expect(:code, 503)
+    # the server will return an html error instead of a json error, and we should handle it
+    @response_mock.expect(:body, <<~HTML)
+      <html>
+      <head><title>503 Service Temporarily Unavailable</title></head>
+      <body>
+      <center><h1>503 Service Temporarily Unavailable</h1></center>
+      <hr><center>openresty/1.15.8.2</center>
+      </body>
+      </html>
+    HTML
+    @mock.expect(:post, @response_mock, client_args)
+
+    exception = assert_raises Exponent::Push::UnknownError do
+      @exponent.publish(messages)
+    end
+
+    assert_equal('503 Service Temporarily Unavailable', exception.message)
+
+    @mock.verify
+  end
+
   def test_publish_with_unknown_error
     @response_mock.expect(:code, 400)
     @response_mock.expect(:body, error_body.to_json)

@@ -54,7 +54,7 @@ module Exponent
       def handle(response)
         case response.code.to_s
         when /(^4|^5)/
-          raise build_error_from_failure(parse_json(response))
+          raise build_error_from_failure(parse_json_or_html(response))
         else
           handle_success(parse_json(response))
         end
@@ -66,6 +66,20 @@ module Exponent
 
       def parse_json(response)
         JSON.parse(response.body)
+      end
+
+      # for errors, we may get back html instead of json. let's handle both
+      def parse_json_or_html(response)
+        body = response.body
+        begin
+          JSON.parse(body)
+        rescue JSON::ParserError
+          if body =~ /<title>(.+)<\/title>/
+            { 'errors' => [{ 'code' => response.code.to_s, 'message' => $1 }] }
+          else
+            raise
+          end
+        end
       end
 
       def build_error_from_failure(response)
