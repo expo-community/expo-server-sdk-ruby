@@ -7,12 +7,12 @@ client = Exponent::Push::Client.new
 
 messages = [{
               to:    'ExponentPushToken[HbuLbNFwb5_ENuljvAePLs]',
-              sound: "default",
+              sound: 'default',
               title: "You're Winning!",
-              body:  "You just won EVERTHING!",
+              body:  'You just won EVERTHING!',
               data:  {
                        type:    'WINNINGS',
-                       message: "You just won EVERTHING!"
+                       message: 'You just won EVERTHING!'
 
                      }.to_json
             }]

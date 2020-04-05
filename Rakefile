@@ -1,19 +1,19 @@
-require "bundler/gem_tasks"
-require "rake/testtask"
+require 'bundler/gem_tasks'
+require 'rake/testtask'
 
-def load_libs(t)
-  t.libs << "test"
-  t.libs << "lib"
+def load_libs(rake_task)
+  rake_task.libs << 'test'
+  rake_task.libs << 'lib'
 end
 
-Rake::TestTask.new(:test) do |t|
-  load_libs t
-  t.test_files = FileList['test/**/*-test.rb']
+Rake::TestTask.new(:test) do |rake_task|
+  load_libs rake_task
+  rake_task.test_files = FileList['test/**/*-test.rb']
 end
 
-Rake::TestTask.new(:manual_test) do |t|
-  load_libs t
-  t.test_files = FileList['manual_test.rb']
+Rake::TestTask.new(:manual_test) do |rake_task|
+  load_libs rake_task
+  rake_task.test_files = FileList['manual_test.rb']
 end
 
-task :default => :test
+task default: :test

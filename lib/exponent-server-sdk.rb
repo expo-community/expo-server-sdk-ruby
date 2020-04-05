@@ -1,7 +1,7 @@
 require 'exponent-server-sdk/version'
+require 'exponent-server-sdk/too_many_messages_error'
 require 'typhoeus'
 require 'json'
-
 
 # Basic Usage:
 #
@@ -30,35 +30,36 @@ require 'json'
 # it will populate a new ResponseHandler with any errors
 # receipt_response = client.verify_deliveries(receipt_ids)
 
-
 module Exponent
   def self.is_exponent_push_token?(token)
     token.start_with?('ExponentPushToken')
   end
 
   module Push
-
     class Client
       def initialize(**args)
         @http_client = args[:http_client] || Typhoeus
+        @error_builder = ErrorBuilder.new
         # future versions will deprecate this
         @response_handler = args[:response_handler] || ResponseHandler.new
         @gzip             = args[:gzip] == true
       end
 
-
       # returns a string response with parsed success json or error
       # @deprecated
       def publish(messages)
-        warn "[DEPRECATION] `publish` is deprecated. Please use `send_messages` instead."
+        warn '[DEPRECATION] `publish` is deprecated. Please use `send_messages` instead.'
         @response_handler.handle(push_notifications(messages))
       end
 
       # returns response handler that provides access to errors? and other response inspection methods
       def send_messages(messages, **args)
+        # https://docs.expo.io/versions/latest/guides/push-notifications/#message-format
+        raise TooManyMessagesError, 'Only 100 message objects at a time allowed.' if messages.length > 100
+
         response = push_notifications(messages)
 
-        #each call to send_messages will return a new instance of ResponseHandler
+        # each call to send_messages will return a new instance of ResponseHandler
         handler = args[:response_handler] || ResponseHandler.new
         handler.process_response(response)
         handler
@@ -73,12 +74,11 @@ module Exponent
 
       private
 
-
       def push_notifications(messages)
         @http_client.post(
-            push_url,
-            body:    messages.to_json,
-            headers: headers
+          push_url,
+          body: messages.to_json,
+          headers: headers
         )
       end
 
@@ -88,9 +88,9 @@ module Exponent
 
       def get_receipts(receipt_ids)
         @http_client.post(
-            receipts_url,
-            body:    {ids: receipt_ids}.to_json,
-            headers: headers
+          receipts_url,
+          body: { ids: receipt_ids }.to_json,
+          headers: headers
         )
       end
 
@@ -99,9 +99,9 @@ module Exponent
       end
 
       def headers
-        headers                    = {
-            'Content-Type' => 'application/json',
-            'Accept'       => 'application/json'
+        headers = {
+          'Content-Type' => 'application/json',
+          'Accept' => 'application/json'
         }
         headers['Accept-Encoding'] = 'gzip, deflate' if @gzip
         headers
@@ -109,7 +109,6 @@ module Exponent
     end
 
     class ResponseHandler
-
       attr_reader :response, :invalid_push_tokens, :receipt_ids, :errors
 
       def initialize(error_builder = ErrorBuilder.new)
@@ -121,7 +120,6 @@ module Exponent
       end
 
       def process_response(response)
-
         @response = response
 
         case response.code.to_s
@@ -150,7 +148,7 @@ module Exponent
       private
 
       def sort_results
-        data = response_body && response_body.fetch('data', nil) || nil
+        data = response_body&.fetch('data', nil) || nil
 
         # something is definitely wrong
         return if data.nil?
@@ -174,9 +172,7 @@ module Exponent
       def process_receipts(receipts)
         receipts.each do |receipt_id, receipt|
           @receipt_ids.push(receipt_id) unless receipt_id.nil?
-          unless receipt.fetch('status') == 'ok'
-            process_error(receipt)
-          end
+          process_error(receipt) unless receipt.fetch('status') == 'ok'
         end
       end
 
@@ -185,25 +181,21 @@ module Exponent
         matches     = message.match(/ExponentPushToken\[(...*)\]/)
         error_class = @error_builder.parse_push_ticket(push_ticket)
 
-        unless matches.nil?
-          @invalid_push_tokens.push(matches[0])
-        end
+        @invalid_push_tokens.push(matches[0]) unless matches.nil?
 
         @errors.push(error_class) unless @errors.include?(error_class)
       end
 
       def response_body
-        begin
-          # memoization FTW!
-          @response_body ||= JSON.parse(response.body)
-        rescue SyntaxError
-          # Sometimes the server returns an empty string.
-          # It must be escaped before we can process it.
-          @response_body = JSON.parse(response.body.to_json)
-        rescue
-          # Prevent nil errors in old version of ruby when using fetch
-          @response_body = {}
-        end
+        # memoization FTW!
+        @response_body ||= JSON.parse(response.body)
+      rescue SyntaxError
+        # Sometimes the server returns an empty string.
+        # It must be escaped before we can process it.
+        @response_body = JSON.parse(response.body.to_json)
+      rescue StandardError
+        # Prevent nil errors in old version of ruby when using fetch
+        @response_body = {}
       end
 
       ##### DEPRECATED METHODS #####
@@ -238,12 +230,9 @@ module Exponent
       def build_error_from_success(response)
         @error_builder.build_from_successful(response)
       end
-
     end
 
     class ErrorBuilder
-
-
       def parse_response(response)
         with_error_handling(response) do
           error      = response.fetch('errors')
@@ -288,9 +277,8 @@ module Exponent
       end
 
       def unknown_error_format(response)
-        Exponent::Push::UnknownError.new("Unknown error format: #{response.to_s}")
+        Exponent::Push::UnknownError.new("Unknown error format: #{response}")
       end
-
 
       ##### DEPRECATED METHODS #####
 

@@ -1,5 +1,8 @@
+# frozen_string_literal: true
+
 require 'minitest/autorun'
 require 'exponent-server-sdk'
+require 'exponent-server-sdk/too_many_messages_error'
 
 class ExponentServerSdkTest < Minitest::Test
   def setup
@@ -16,6 +19,19 @@ class ExponentServerSdkTest < Minitest::Test
     @mock.expect(:post, @response_mock, client_args)
 
     response = @client.send_messages(messages)
+    assert_equal(response.errors?, false)
+
+    @mock.verify
+  end
+
+  def test_send_messages_alternate_message_format_with_success
+    @response_mock.expect(:code, 200)
+    @response_mock.expect(:body, success_body.to_json)
+
+    alternate_messages = alternate_format_messages
+    @mock.expect(:post, @response_mock, alternative_client_args(alternate_messages))
+
+    response = @client.send_messages(alternate_messages)
     assert_equal(response.errors?, false)
 
     @mock.verify
@@ -161,8 +177,17 @@ class ExponentServerSdkTest < Minitest::Test
     assert(response_handler.invalid_push_tokens.include?(token))
     assert(response_handler.errors?)
 
-
     @mock.verify
+  end
+
+  def test_send_messages_too_many_messages
+    message = 'Only 100 message objects at a time allowed.'
+
+    e = assert_raises TooManyMessagesError do
+      @client.send_messages(too_many_messages)
+    end
+
+    assert_equal(e.message, message)
   end
 
   def test_send_messages_with_message_too_big_error
@@ -221,7 +246,6 @@ class ExponentServerSdkTest < Minitest::Test
     @mock.verify
   end
 
-
   def test_get_receipts_with_success_receipt
     @response_mock.expect(:code, 200)
     @response_mock.expect(:body, receipt_success_body.to_json)
@@ -251,7 +275,6 @@ class ExponentServerSdkTest < Minitest::Test
     @mock.verify
   end
 
-
   def test_get_receipts_with_variable_success_receipts
     @response_mock.expect(:code, 200)
     @response_mock.expect(:body, multiple_receipts.to_json)
@@ -268,7 +291,6 @@ class ExponentServerSdkTest < Minitest::Test
 
     @mock.verify
   end
-
 
   # DEPRECATED -- TESTS BELOW HERE RELATE TO CODE THAT WILL BE REMOVED
 
@@ -403,7 +425,7 @@ class ExponentServerSdkTest < Minitest::Test
   private
 
   def success_body
-    {'data' => [{'status' => 'ok'}]}
+    { 'data' => [{ 'status' => 'ok' }] }
   end
 
   def success_receipt
@@ -416,51 +438,51 @@ class ExponentServerSdkTest < Minitest::Test
 
   def receipt_success_body
     {
-        'data' => {
-            'YYYYYYYY-YYYY-YYYY-YYYY-YYYYYYYYYYYY' => {
-                'status' => 'ok'
-            }
+      'data' => {
+        'YYYYYYYY-YYYY-YYYY-YYYY-YYYYYYYYYYYY' => {
+          'status' => 'ok'
         }
+      }
     }
   end
 
   def receipt_error_body
     {
-        'data' => {
-            'XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX' => {
-                'status'  => 'error',
-                'message' => 'The Apple Push Notification service failed to send the notification',
-                'details' => {
-                    'error' => 'DeviceNotRegistered'
-                }
-            }
+      'data' => {
+        'XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX' => {
+          'status' => 'error',
+          'message' => 'The Apple Push Notification service failed to send the notification',
+          'details' => {
+            'error' => 'DeviceNotRegistered'
+          }
         }
+      }
     }
   end
 
   def multiple_receipts
     {
-        'data' => {
-            'XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX' => {
-                'status'  => 'error',
-                'message' => 'The Apple Push Notification service failed to send the notification',
-                'details' => {
-                    'error' => 'DeviceNotRegistered'
-                }
-            },
-            'YYYYYYYY-YYYY-YYYY-YYYY-YYYYYYYYYYYY' => {
-                'status' => 'ok'
-            }
+      'data' => {
+        'XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX' => {
+          'status' => 'error',
+          'message' => 'The Apple Push Notification service failed to send the notification',
+          'details' => {
+            'error' => 'DeviceNotRegistered'
+          }
+        },
+        'YYYYYYYY-YYYY-YYYY-YYYY-YYYYYYYYYYYY' => {
+          'status' => 'ok'
         }
+      }
     }
   end
 
   def error_body
     {
-        'errors' => [{
-                         'code'    => 'INTERNAL_SERVER_ERROR',
-                         'message' => 'An unknown error occurred.'
-                     }]
+      'errors' => [{
+        'code' => 'INTERNAL_SERVER_ERROR',
+        'message' => 'An unknown error occurred.'
+      }]
     }
   end
 
@@ -470,8 +492,8 @@ class ExponentServerSdkTest < Minitest::Test
 
   def not_registered_device_error_body
     build_error_body(
-        'DeviceNotRegistered',
-        '"ExponentPushToken[42]" is not a registered push notification recipient'
+      'DeviceNotRegistered',
+      '"ExponentPushToken[42]" is not a registered push notification recipient'
     )
   end
 
@@ -485,74 +507,111 @@ class ExponentServerSdkTest < Minitest::Test
 
   def apn_error_body
     {
-        'data' => [{
-                       'status'  => 'error',
-                       'message' =>
-                           'Could not find APNs credentials for you (your_app). Check whether you are trying to send a notification to a detached app.'
-                   }]
+      'data' => [{
+        'status' => 'error',
+        'message' =>
+                         'Could not find APNs credentials for you (your_app). Check whether you are trying to send a notification to a detached app.'
+      }]
     }
   end
 
   def client_args
     [
-        'https://exp.host/--/api/v2/push/send',
-        {
-            body:    messages.to_json,
-            headers: {
-                'Content-Type' => 'application/json',
-                'Accept'       => 'application/json'
-            }
+      'https://exp.host/--/api/v2/push/send',
+      {
+        body: messages.to_json,
+        headers: {
+          'Content-Type' => 'application/json',
+          'Accept' => 'application/json'
         }
+      }
+    ]
+  end
+
+  def alternative_client_args(messages)
+    [
+      'https://exp.host/--/api/v2/push/send',
+      {
+        body: messages.to_json,
+        headers: {
+          'Content-Type' => 'application/json',
+          'Accept' => 'application/json'
+        }
+      }
     ]
   end
 
   def gzip_client_args
     [
-        'https://exp.host/--/api/v2/push/send',
-        {
-            body:    messages.to_json,
-            headers: {
-                'Content-Type'    => 'application/json',
-                'Accept'          => 'application/json',
-                'Accept-Encoding' => 'gzip, deflate'
-            }
+      'https://exp.host/--/api/v2/push/send',
+      {
+        body: messages.to_json,
+        headers: {
+          'Content-Type' => 'application/json',
+          'Accept' => 'application/json',
+          'Accept-Encoding' => 'gzip, deflate'
         }
+      }
     ]
   end
 
   def receipt_client_args(receipt_ids)
     [
-        'https://exp.host/--/api/v2/push/getReceipts',
-        {
-            body:    {ids: receipt_ids}.to_json,
-            headers: {
-                'Content-Type' => 'application/json',
-                'Accept'       => 'application/json'
-            }
+      'https://exp.host/--/api/v2/push/getReceipts',
+      {
+        body: { ids: receipt_ids }.to_json,
+        headers: {
+          'Content-Type' => 'application/json',
+          'Accept' => 'application/json'
         }
+      }
     ]
   end
 
+  def alternate_format_messages
+    [{
+      to: [
+        'ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]',
+        'ExponentPushToken[yyyyyyyyyyyyyyyyyyyyyy]'
+      ],
+      badge: 1,
+      sound: 'default',
+      body: 'You got a completely unique message from us! /s'
+    }]
+  end
 
   def messages
     [{
-         to:    'ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]',
-         sound: 'default',
-         body:  'Hello world!'
-     }, {
-         to:    'ExponentPushToken[yyyyyyyyyyyyyyyyyyyyyy]',
-         badge: 1,
-         body:  "You've got mail"
-     }]
+      to: 'ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]',
+      sound: 'default',
+      body: 'Hello world!'
+    }, {
+      to: 'ExponentPushToken[yyyyyyyyyyyyyyyyyyyyyy]',
+      badge: 1,
+      body: "You've got mail"
+    }]
+  end
+
+  def too_many_messages
+    (0..101).map { create_message }
+  end
+
+  def create_message
+    id = (0...22).map { ('a'..'z').to_a[rand(26)] }.join
+    {
+      to: "ExponentPushToken[#{id}]",
+      sound: 'default',
+      body: 'Hello world!'
+    }
   end
 
   def build_error_body(error_code, message)
     {
-        'data' => [{
-                       'status'  => 'error',
-                       'message' => message,
-                       'details' => {'error' => error_code}
-                   }]
+      'data' => [{
+        'status' => 'error',
+        'message' => message,
+        'details' => { 'error' => error_code }
+      }]
     }
   end
 end
