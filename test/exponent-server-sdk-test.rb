@@ -292,6 +292,52 @@ class ExponentServerSdkTest < Minitest::Test
     @mock.verify
   end
 
+  def test_get_receipts_with_gzip_success_receipt
+    @response_mock.expect(:code, 200)
+    @response_mock.expect(:body, receipt_success_body.to_json)
+    receipt_ids = [success_receipt]
+
+    @mock.expect(:post, @response_mock, gzip_receipt_client_args(receipt_ids))
+
+    response_handler = @client_gzip.verify_deliveries(receipt_ids)
+    assert_match(success_receipt, response_handler.receipt_ids.first)
+
+    @mock.verify
+  end
+
+  def test_get_receipts_with_gzip_error_receipt
+    @response_mock.expect(:code, 200)
+    @response_mock.expect(:body, receipt_error_body.to_json)
+    receipt_ids = [error_receipt]
+
+    @mock.expect(:post, @response_mock, gzip_receipt_client_args(receipt_ids))
+
+    response_handler = @client_gzip.verify_deliveries(receipt_ids)
+    assert_match(error_receipt, response_handler.receipt_ids.first)
+    assert_equal(true, response_handler.errors?)
+    assert_equal(1, response_handler.errors.count)
+    assert(response_handler.errors.first.instance_of?(Exponent::Push::DeviceNotRegisteredError))
+
+    @mock.verify
+  end
+
+  def test_get_receipts_with_gzip_variable_success_receipts
+    @response_mock.expect(:code, 200)
+    @response_mock.expect(:body, multiple_receipts.to_json)
+    receipt_ids = [error_receipt, success_receipt]
+
+    @mock.expect(:post, @response_mock, gzip_receipt_client_args(receipt_ids))
+
+    response_handler = @client_gzip.verify_deliveries(receipt_ids)
+    assert_match(error_receipt, response_handler.receipt_ids.first)
+    assert_match(success_receipt, response_handler.receipt_ids.last)
+    assert_equal(true, response_handler.errors?)
+    assert_equal(1, response_handler.errors.count)
+    assert(response_handler.errors.first.instance_of?(Exponent::Push::DeviceNotRegisteredError))
+
+    @mock.verify
+  end
+
   # DEPRECATED -- TESTS BELOW HERE RELATE TO CODE THAT WILL BE REMOVED
 
   def test_publish_with_success
@@ -523,7 +569,8 @@ class ExponentServerSdkTest < Minitest::Test
         headers: {
           'Content-Type' => 'application/json',
           'Accept' => 'application/json'
-        }
+        },
+        accept_encoding: false
       }
     ]
   end
@@ -536,7 +583,8 @@ class ExponentServerSdkTest < Minitest::Test
         headers: {
           'Content-Type' => 'application/json',
           'Accept' => 'application/json'
-        }
+        },
+        accept_encoding: false
       }
     ]
   end
@@ -548,9 +596,9 @@ class ExponentServerSdkTest < Minitest::Test
         body: messages.to_json,
         headers: {
           'Content-Type' => 'application/json',
-          'Accept' => 'application/json',
-          'Accept-Encoding' => 'gzip, deflate'
-        }
+          'Accept' => 'application/json'
+        },
+        accept_encoding: true
       }
     ]
   end
@@ -563,7 +611,22 @@ class ExponentServerSdkTest < Minitest::Test
         headers: {
           'Content-Type' => 'application/json',
           'Accept' => 'application/json'
-        }
+        },
+        accept_encoding: false
+      }
+    ]
+  end
+
+  def gzip_receipt_client_args(receipt_ids)
+    [
+      'https://exp.host/--/api/v2/push/getReceipts',
+      {
+        body: { ids: receipt_ids }.to_json,
+        headers: {
+          'Content-Type' => 'application/json',
+          'Accept' => 'application/json'
+        },
+        accept_encoding: true
       }
     ]
   end
