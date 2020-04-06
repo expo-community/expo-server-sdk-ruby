@@ -8,8 +8,7 @@ require 'json'
 # Create new client
 # client = Exponent::Push::Client.new(**args)
 #
-# Send UPTO ~~100~~ messages per request,
-# Use [].each_slice(100) to split your data or it will fail
+# Send UPTO ~~100~~ messages per call,
 # https://docs.expo.io/versions/latest/guides/push-notifications/#message-format
 # response_handler = client.send_messages([list of formatted messages])
 #
@@ -78,7 +77,8 @@ module Exponent
         @http_client.post(
           push_url,
           body: messages.to_json,
-          headers: headers
+          headers: headers,
+          accept_encoding: @gzip
         )
       end
 
@@ -90,7 +90,8 @@ module Exponent
         @http_client.post(
           receipts_url,
           body: { ids: receipt_ids }.to_json,
-          headers: headers
+          headers: headers,
+          accept_encoding: @gzip
         )
       end
 
@@ -103,7 +104,6 @@ module Exponent
           'Content-Type' => 'application/json',
           'Accept' => 'application/json'
         }
-        headers['Accept-Encoding'] = 'gzip, deflate' if @gzip
         headers
       end
     end
@@ -136,6 +136,7 @@ module Exponent
 
       # @deprecated
       def handle(response)
+        warn '[DEPRECATION] `handle` is deprecated. Please use `process_response` instead.'
         @response = response
         case response.code.to_s
         when /(^4|^5)/
@@ -148,7 +149,7 @@ module Exponent
       private
 
       def sort_results
-        data = response_body&.fetch('data', nil) || nil
+        data = body&.fetch('data', nil) || nil
 
         # something is definitely wrong
         return if data.nil?
@@ -186,34 +187,34 @@ module Exponent
         @errors.push(error_class) unless @errors.include?(error_class)
       end
 
-      def response_body
+      def body
         # memoization FTW!
-        @response_body ||= JSON.parse(response.body)
+        @body ||= JSON.parse(@response.body)
       rescue SyntaxError
         # Sometimes the server returns an empty string.
         # It must be escaped before we can process it.
-        @response_body = JSON.parse(response.body.to_json)
+        @body = JSON.parse(@response.body.to_json)
       rescue StandardError
         # Prevent nil errors in old version of ruby when using fetch
-        @response_body = {}
+        @body = {}
       end
 
       ##### DEPRECATED METHODS #####
 
       # @deprecated
       def build_error_from_failure
-        @error_builder.build_from_erroneous(response_body)
+        @error_builder.build_from_erroneous(body)
       end
 
       # @deprecated
       def extract_data
-        data = response_body.fetch('data')
+        data = body.fetch('data')
         if data.is_a? Hash
-          validate_status(data.fetch('status'), response_body)
+          validate_status(data.fetch('status'), body)
           data
         elsif data.is_a? Array
           data.map do |receipt|
-            validate_status(receipt.fetch('status'), response_body)
+            validate_status(receipt.fetch('status'), body)
             receipt
           end
         else
