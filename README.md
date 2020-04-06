@@ -1,4 +1,5 @@
 # Exponent Server SDK Ruby
+
 [![Build Status](https://travis-ci.org/expo/expo-server-sdk-ruby.svg?branch=master)](https://travis-ci.org/expo/expo-server-sdk-ruby)
 [![Gem Version](https://badge.fury.io/rb/exponent-server-sdk.svg)](https://badge.fury.io/rb/exponent-server-sdk)
 
@@ -28,10 +29,9 @@ $ gem install exponent-server-sdk
 
 ### Client
 
-The push client is the preferred way.  This hits the latest version of the api.
+The push client is the preferred way. This hits the latest version of the api.
 
-Optional arguments: `gzip: true` 
-
+Optional arguments: `gzip: true`
 
 ```ruby
 client = Exponent::Push::Client.new
@@ -61,6 +61,8 @@ handler = client.send_messages(messages)
 client.verify_deliveries(handler.receipt_ids)
 
 ```
+
+See the getting started example. If you clone this repo, you can also use it to test locally by entering your ExponentPushToken. Otherwise it serves as a good copy pasta example to get you going.
 
 The complete format of the messages can be found [here.](https://docs.expo.io/versions/latest/guides/push-notifications#message-format)
 

@@ -11,9 +11,9 @@ Rake::TestTask.new(:test) do |rake_task|
   rake_task.test_files = FileList['test/**/*-test.rb']
 end
 
-Rake::TestTask.new(:manual_test) do |rake_task|
+Rake::TestTask.new(:getting_started) do |rake_task|
   load_libs rake_task
-  rake_task.test_files = FileList['manual_test.rb']
+  rake_task.test_files = FileList['examples/getting_started.rb']
 end
 
 task default: :test
