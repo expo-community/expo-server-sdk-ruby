@@ -1,0 +1,2 @@
+class TooManyMessagesError < StandardError
+end
