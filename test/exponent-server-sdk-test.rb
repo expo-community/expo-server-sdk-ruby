@@ -143,7 +143,7 @@ class ExponentServerSdkTest < Minitest::Test
       @client.send_messages(messages)
     end
 
-    assert_match(/Unknown error format/, exception.message)
+    assert_equal("Unknown error format: #{error_body.to_json}", exception.message)
 
     @mock.verify
   end
