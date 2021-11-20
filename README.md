@@ -64,7 +64,7 @@ client.verify_deliveries(handler.receipt_ids)
 
 See the getting started example. If you clone this repo, you can also use it to test locally by entering your ExponentPushToken. Otherwise it serves as a good copy pasta example to get you going.
 
-The complete format of the messages can be found [here.](https://docs.expo.io/versions/latest/guides/push-notifications#message-format)
+The complete format of the messages can be found [here.](https://docs.expo.io/push-notifications/sending-notifications/#message-request-format)
 
 ## Contributing
 
