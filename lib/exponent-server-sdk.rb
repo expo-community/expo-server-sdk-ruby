@@ -278,7 +278,7 @@ module Exponent
       end
 
       def unknown_error_format(response)
-        Exponent::Push::UnknownError.new("Unknown error format: #{response}")
+        Exponent::Push::UnknownError.new("Unknown error format: #{response.respond_to?(:body) ? response.body : response}")
       end
 
       ##### DEPRECATED METHODS #####
