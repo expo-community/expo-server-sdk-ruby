@@ -178,11 +178,13 @@ module Exponent
       end
 
       def process_error(push_ticket)
-        message     = push_ticket.fetch('message')
-        matches     = message.match(/ExponentPushToken\[(...*)\]/)
+        message      = push_ticket.fetch('message')
+        invalid      = message.match(/ExponentPushToken\[(...*)\]/)
+        unregistered = message.match(/\"(...*)\"/)
         error_class = @error_builder.parse_push_ticket(push_ticket)
 
-        @invalid_push_tokens.push(matches[0]) unless matches.nil?
+        @invalid_push_tokens.push(invalid[0]) unless invalid.nil?
+        @invalid_push_tokens.push(unregistered[1]) unless unregistered.nil?
 
         @errors.push(error_class) unless @errors.include?(error_class)
       end
