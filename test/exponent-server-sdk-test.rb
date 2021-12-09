@@ -3,6 +3,7 @@
 require 'minitest/autorun'
 require 'exponent-server-sdk'
 require 'exponent-server-sdk/too_many_messages_error'
+require 'byebug'
 
 class ExponentServerSdkTest < Minitest::Test
   def setup
@@ -139,11 +140,11 @@ class ExponentServerSdkTest < Minitest::Test
 
     @mock.expect(:post, @response_mock, client_args)
 
-    exception = assert_raises Exponent::Push::UnknownError do
+    exception = assert_raises Exponent::Push::InternalServerErrorError do
       @client.send_messages(messages)
     end
 
-    assert_equal("Unknown error format: #{error_body.to_json}", exception.message)
+    assert_equal "An unknown error occurred.", exception.message
 
     @mock.verify
   end
@@ -154,11 +155,27 @@ class ExponentServerSdkTest < Minitest::Test
 
     @mock.expect(:post, @response_mock, gzip_client_args)
 
-    exception = assert_raises Exponent::Push::UnknownError do
+    exception = assert_raises Exponent::Push::InternalServerErrorError do
       @client_gzip.send_messages(messages)
     end
 
-    assert_match(/Unknown error format/, exception.message)
+    assert_match(/An unknown error occurred./, exception.message)
+
+    @mock.verify
+  end
+
+  def test_send_messages_with_too_many_experience_ids
+    @response_mock.expect(:code, 400)
+    @response_mock.expect(:body, too_many_experience_ids_error_body.to_json)
+
+    @mock.expect(:post, @response_mock, gzip_client_args)
+
+    exception = assert_raises Exponent::Push::PushTooManyExperienceIdsError do
+      @client_gzip.send_messages(messages)
+    end
+
+    assert_equal exception.message,
+      %{All push notification messages in the same request must be for the same project; check the details field to investigate conflicting tokens. Details: {\"@tribefy/john\"=>[\"ExponentPushToken[oZS8VdPqgD6rxgv2W4351q]\", \"ExponentPushToken[HZ3emUCXmG345BcGvEoh0n0]\", \"ExponentPushToken[l7NKVXNu344KRR1rtwbfY]\", \"ExponentPushToken[F3Bm3333RT4ITIF0ceW6Wr]\"], \"@tribefy/paul\"=>[\"ExponentPushToken[8ZkJoxIO455nGISDwhtjY]\"]}}
 
     @mock.verify
   end
@@ -338,136 +355,6 @@ class ExponentServerSdkTest < Minitest::Test
     @mock.verify
   end
 
-  # DEPRECATED -- TESTS BELOW HERE RELATE TO CODE THAT WILL BE REMOVED
-
-  def test_publish_with_success
-    @response_mock.expect(:code, 200)
-    @response_mock.expect(:body, success_body.to_json)
-
-    @mock.expect(:post, @response_mock, client_args)
-
-    @client.publish(messages)
-
-    @mock.verify
-  end
-
-  def test_publish_with_gzip_success
-    @response_mock.expect(:code, 200)
-    @response_mock.expect(:body, success_body.to_json)
-
-    @mock.expect(:post, @response_mock, gzip_client_args)
-
-    @client_gzip.publish(messages)
-
-    @mock.verify
-  end
-
-  def test_publish_with_gzip
-    @response_mock.expect(:code, 200)
-    @response_mock.expect(:body, success_body.to_json)
-
-    @mock.expect(:post, @response_mock, gzip_client_args)
-
-    @client_gzip.publish(messages)
-
-    @mock.verify
-  end
-
-  def test_publish_with_unknown_error
-    @response_mock.expect(:code, 400)
-    @response_mock.expect(:body, error_body.to_json)
-    message = 'An unknown error occurred.'
-
-    @mock.expect(:post, @response_mock, client_args)
-
-    exception = assert_raises Exponent::Push::UnknownError do
-      @client.publish(messages)
-    end
-
-    assert_equal(message, exception.message)
-
-    @mock.verify
-  end
-
-  def test_publish_with_device_not_registered_error
-    @response_mock.expect(:code, 200)
-    @response_mock.expect(:body, not_registered_device_error_body.to_json)
-    message = '"ExponentPushToken[42]" is not a registered push notification recipient'
-
-    @mock.expect(:post, @response_mock, client_args)
-
-    exception = assert_raises Exponent::Push::DeviceNotRegisteredError do
-      @client.publish(messages)
-    end
-
-    assert_equal(message, exception.message)
-
-    @mock.verify
-  end
-
-  def test_publish_with_message_too_big_error
-    @response_mock.expect(:code, 200)
-    @response_mock.expect(:body, message_too_big_error_body.to_json)
-    message = 'Message too big'
-
-    @mock.expect(:post, @response_mock, client_args)
-
-    exception = assert_raises Exponent::Push::MessageTooBigError do
-      @client.publish(messages)
-    end
-
-    assert_equal(message, exception.message)
-
-    @mock.verify
-  end
-
-  def test_publish_with_message_rate_exceeded_error
-    @response_mock.expect(:code, 200)
-    @response_mock.expect(:body, message_rate_exceeded_error_body.to_json)
-    message = 'Message rate exceeded'
-
-    @mock.expect(:post, @response_mock, client_args)
-
-    exception = assert_raises Exponent::Push::MessageRateExceededError do
-      @client.publish(messages)
-    end
-
-    assert_equal(message, exception.message)
-
-    @mock.verify
-  end
-
-  def test_publish_with_invalid_credentials_error
-    @response_mock.expect(:code, 200)
-    @response_mock.expect(:body, invalid_credentials_error_body.to_json)
-    message = 'Invalid credentials'
-
-    @mock.expect(:post, @response_mock, client_args)
-
-    exception = assert_raises Exponent::Push::InvalidCredentialsError do
-      @client.publish(messages)
-    end
-
-    assert_equal(message, exception.message)
-
-    @mock.verify
-  end
-
-  def test_publish_with_apn_error
-    @response_mock.expect(:code, 200)
-    @response_mock.expect(:body, apn_error_body.to_json)
-
-    @mock.expect(:post, @response_mock, client_args)
-
-    exception = assert_raises Exponent::Push::UnknownError do
-      @client.publish(messages)
-    end
-
-    assert_match(/Unknown error format/, exception.message)
-
-    @mock.verify
-  end
-
   private
 
   def success_body
@@ -532,6 +419,22 @@ class ExponentServerSdkTest < Minitest::Test
     }
   end
 
+  def too_many_experience_ids_error_body
+    {
+      "errors"=>[
+        {
+          "code"=>"PUSH_TOO_MANY_EXPERIENCE_IDS",
+          "message"=>"All push notification messages in the same request must be for the same project; check the details field to investigate conflicting tokens.",
+          "details"=>{
+            "@tribefy/john"=>["ExponentPushToken[oZS8VdPqgD6rxgv2W4351q]", "ExponentPushToken[HZ3emUCXmG345BcGvEoh0n0]", "ExponentPushToken[l7NKVXNu344KRR1rtwbfY]", "ExponentPushToken[F3Bm3333RT4ITIF0ceW6Wr]"],
+            "@tribefy/paul"=>["ExponentPushToken[8ZkJoxIO455nGISDwhtjY]"],
+          },
+          "isTransient"=>false
+        },
+      ],
+    }
+  end
+
   def message_too_big_error_body
     build_error_body('MessageTooBig', 'Message too big')
   end
@@ -556,7 +459,7 @@ class ExponentServerSdkTest < Minitest::Test
       'data' => [{
         'status' => 'error',
         'message' =>
-                         'Could not find APNs credentials for you (your_app). Check whether you are trying to send a notification to a detached app.'
+          'Could not find APNs credentials for you (your_app). Check whether you are trying to send a notification to a detached app.'
       }]
     }
   end
