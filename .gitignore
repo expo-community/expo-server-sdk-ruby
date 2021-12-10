@@ -3,6 +3,8 @@
 .bundle
 .config
 .yardoc
+.byebug_history
+.rakeTasks
 Gemfile.lock
 InstalledFiles
 _yardoc

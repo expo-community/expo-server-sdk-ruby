@@ -36,19 +36,12 @@ module Exponent
 
   module Push
     class Client
-      def initialize(**args)
-        @http_client = args[:http_client] || Typhoeus
-        @error_builder = ErrorBuilder.new
-        # future versions will deprecate this
-        @response_handler = args[:response_handler] || ResponseHandler.new
-        @gzip             = args[:gzip] == true
-      end
 
-      # returns a string response with parsed success json or error
-      # @deprecated
-      def publish(messages)
-        warn '[DEPRECATION] `publish` is deprecated. Please use `send_messages` instead.'
-        @response_handler.handle(push_notifications(messages))
+      attr_reader :post_options, :http_client
+
+      def initialize(http_client: Typhoeus, gzip: nil, **post_options)
+        @http_client = http_client
+        @post_options = {accept_encoding: gzip == true}.update(post_options)
       end
 
       # returns response handler that provides access to errors? and other response inspection methods
@@ -74,11 +67,11 @@ module Exponent
       private
 
       def push_notifications(messages)
-        @http_client.post(
+        http_client.post(
           push_url,
           body: messages.to_json,
           headers: headers,
-          accept_encoding: @gzip
+          **post_options
         )
       end
 
@@ -87,11 +80,11 @@ module Exponent
       end
 
       def get_receipts(receipt_ids)
-        @http_client.post(
+        http_client.post(
           receipts_url,
           body: { ids: receipt_ids }.to_json,
           headers: headers,
-          accept_encoding: @gzip
+          **post_options
         )
       end
 
@@ -124,7 +117,10 @@ module Exponent
 
         case response.code.to_s
         when /(^4|^5)/
-          raise @error_builder.parse_response(response)
+          # @aryk - This used to be parsing the response, but the error builder is expecting a hash, so it's most likely
+          # the body here. I think this was the root for a lot of issues in the API.
+          # raise @error_builder.parse_response(response)
+          raise @error_builder.parse_response(body)
         else
           sort_results
         end
@@ -132,18 +128,6 @@ module Exponent
 
       def errors?
         @errors.any?
-      end
-
-      # @deprecated
-      def handle(response)
-        warn '[DEPRECATION] `handle` is deprecated. Please use `process_response` instead.'
-        @response = response
-        case response.code.to_s
-        when /(^4|^5)/
-          raise build_error_from_failure
-        else
-          extract_data
-        end
       end
 
       private
@@ -181,9 +165,9 @@ module Exponent
         message      = push_ticket.fetch('message')
         invalid      = message.match(/ExponentPushToken\[(...*)\]/)
         unregistered = message.match(/\"(...*)\"/)
-        error_class = @error_builder.parse_push_ticket(push_ticket)
+        error_class  = @error_builder.parse_push_ticket(push_ticket)
 
-        @invalid_push_tokens.push(invalid[0]) unless invalid.nil?
+        @invalid_push_tokens.push(invalid[0])      unless invalid.nil?
         @invalid_push_tokens.push(unregistered[1]) unless unregistered.nil?
 
         @errors.push(error_class) unless @errors.include?(error_class)
@@ -201,47 +185,19 @@ module Exponent
         @body = {}
       end
 
-      ##### DEPRECATED METHODS #####
-
-      # @deprecated
-      def build_error_from_failure
-        @error_builder.build_from_erroneous(body)
-      end
-
-      # @deprecated
-      def extract_data
-        data = body.fetch('data')
-        if data.is_a? Hash
-          validate_status(data.fetch('status'), body)
-          data
-        elsif data.is_a? Array
-          data.map do |receipt|
-            validate_status(receipt.fetch('status'), body)
-            receipt
-          end
-        else
-          {}
-        end
-      end
-
-      # @deprecated
-      def validate_status(status, response)
-        raise build_error_from_success(response) unless status == 'ok'
-      end
-
-      # @deprecated
-      def build_error_from_success(response)
-        @error_builder.build_from_successful(response)
-      end
     end
 
     class ErrorBuilder
       def parse_response(response)
         with_error_handling(response) do
           error      = response.fetch('errors')
+          error      = error[0] if error.is_a?(Array) # with PUSH_TOO_MANY_EXPERIENCE_IDS will get an array of one
           error_name = error.fetch('code')
           message    = error.fetch('message')
-
+          if (details = error['details'])
+            details = "#{details[0..500]}..." if details.size > 500 # don't use ruby truncate incase they are using an older version of Ruby
+            message << " Details: #{details}"
+          end
           get_error_class(error_name).new(message)
         end
       end
@@ -253,20 +209,12 @@ module Exponent
         end
       end
 
-      %i[erroneous successful].each do |selector|
-        define_method(:"build_from_#{selector}") do |response|
-          with_error_handling(response) do
-            send "from_#{selector}_response", response
-          end
-        end
-      end
-
       private
 
       def with_error_handling(response)
-        yield(response)
-      rescue KeyError, NoMethodError
-        unknown_error_format(response)
+        yield
+      rescue KeyError, NoMethodError => e
+        unknown_error_format(response, e.message)
       end
 
       def validate_error_name(condition)
@@ -274,39 +222,30 @@ module Exponent
       end
 
       def get_error_class(error_name)
+        error_name = classify(error_name)
         validate_error_name(Exponent::Push.error_names.include?(error_name)) do
           Exponent::Push.const_get("#{error_name}Error")
         end
       end
 
-      def unknown_error_format(response)
-        Exponent::Push::UnknownError.new("Unknown error format: #{response.respond_to?(:body) ? response.body : response}")
+      # https://stackoverflow.com/a/4072202/7180620
+      def classify(str)
+        str = str.split('_').collect! { |w| w.capitalize }.join if str=~/^[[A-Z0-9]_]+$/
+        str
       end
 
-      ##### DEPRECATED METHODS #####
-
-      # @deprecated
-      def from_erroneous_response(response)
-        error      = response.fetch('errors').first
-        error_name = error.fetch('code')
-        message    = error.fetch('message')
-
-        get_error_class(error_name).new(message)
-      end
-
-      # @deprecated
-      def from_successful_response(response)
-        delivery_result = response.fetch('data').first
-        message         = delivery_result.fetch('message')
-        get_error_class(delivery_result.fetch('details').fetch('error')).new(message)
+      def unknown_error_format(response, error_message = nil)
+        str = "Unknown error format: #{response.respond_to?(:body) ? response.body : response}"
+        str << " | #{error_message}" if error_message
+        Exponent::Push::UnknownError.new(str)
       end
     end
 
     Error = Class.new(StandardError)
 
     def self.error_names
-      %w[DeviceNotRegistered MessageTooBig
-         MessageRateExceeded InvalidCredentials
+      %w[DeviceNotRegistered MessageTooBig PushTooManyExperienceIds
+         MessageRateExceeded InvalidCredentials InternalServerError
          Unknown]
     end
 
