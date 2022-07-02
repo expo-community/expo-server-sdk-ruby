@@ -42,6 +42,7 @@ module Exponent
         # future versions will deprecate this
         @response_handler = args[:response_handler] || ResponseHandler.new
         @gzip             = args[:gzip] == true
+        @headers          = args[:headers] ? headers.merge!(args[:headers]) : headers
       end
 
       # returns a string response with parsed success json or error
@@ -77,7 +78,7 @@ module Exponent
         @http_client.post(
           push_url,
           body: messages.to_json,
-          headers: headers,
+          headers: @headers,
           accept_encoding: @gzip
         )
       end
@@ -90,7 +91,7 @@ module Exponent
         @http_client.post(
           receipts_url,
           body: { ids: receipt_ids }.to_json,
-          headers: headers,
+          headers: @headers,
           accept_encoding: @gzip
         )
       end
